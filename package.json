@@ -1,6 +1,6 @@
 {
   "name": "mac-health-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server that lets Claude check your Mac's health (CPU, memory, disk, battery, heat, uptime) and explain why it might be slow. macOS only. Zero dependencies, local and read-only.",
   "main": "server/index.js",
   "bin": {

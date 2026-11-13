@@ -2,9 +2,21 @@
 
 MCP server that lets Claude check your Mac's health and explain in plain English why it might be slow. Local, read-only, zero dependencies.
 
-**Status: milestone 1 (v0.1.0, not released).** One tool so far; more are planned (top processes, memory, disk, battery, thermal, startup items and `diagnose_slowness`).
+**Status: milestone 2 (v0.2.0, not released).** Seven tools so far; `diagnose_slowness` and more are planned.
 
-## Tool
+## Tools
+
+All tools are read-only and local.
+
+| Tool | What it does |
+|---|---|
+| `get_mac_overview` | Health check of the whole Mac, each part graded (details below). |
+| `top_processes` | Which apps and processes use the most CPU and memory right now, grouped per app, with cryptic macOS names explained (optional `limit`, 1-25). |
+| `memory_report` | Memory pressure, swap, compressed memory and file cache in plain language, with a grade. |
+| `disk_report` | Free space on the startup disk with a grade, plus the largest folders in your home folder. Can take up to about 20 seconds. |
+| `battery_report` | Battery health, cycles, charge state, temperature and tips, with a grade. Desktop Macs get a "no battery" answer. |
+| `thermal_status` | Whether macOS is slowing the processor down because of heat, with advice. |
+| `startup_items` | What starts automatically (launch agents and daemons), marked as Apple or third party. Only lists, never changes. |
 
 ### `get_mac_overview`
 A health check of the whole Mac, each part graded **Bra** (good), **Okej** (ok) or **Behöver åtgärd** (needs attention), with advice when something is off:
@@ -25,7 +37,7 @@ If a command is missing or fails, that part is reported as **Okänd** (unknown) 
 ## Privacy
 
 - Everything runs locally with built-in macOS tools. No network requests, no telemetry.
-- Read-only: never deletes, closes or changes anything. No admin password.
+- Read-only: never deletes, closes or changes anything. No admin password. Process names are explained with a built-in dictionary; only names are returned, never user names or full paths.
 - Commands run without a shell, with absolute paths and a timeout.
 - Only whitelisted values are parsed. Serial numbers, UUIDs, hardware IDs, MAC addresses, user names and home folder paths are filtered out before anything is sent to Claude.
 
