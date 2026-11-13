@@ -45,7 +45,7 @@ function checkArgs(args, schema) {
 }
 
 async function overviewTool() {
-  if (process.platform !== 'darwin' && !process.env.MAC_HEALTH_ALLOW_ANY_OS) {
+  if (process.platform !== 'darwin') {
     throw new ToolError(`Mac Health only works on macOS (this is ${process.platform}).`, { code: 'unsupported' });
   }
   const { raw, failures } = await collectOverview();
