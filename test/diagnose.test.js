@@ -9,10 +9,22 @@ const { explainProcess } = require('../server/lib/explain');
 const NOW = Date.UTC(2026, 10, 13, 12, 0, 0);
 const DAY = 86400;
 
+/** Made-up startup folders (shaped like collectStartup): `third` items from third parties plus two from Apple. */
+function startupDirs(third, { userError = null } = {}) {
+  const made = Array.from({ length: third }, (_, i) => (i % 2 ? `com.exampleco.helper${i}.plist` : `DemoSync${i}.plist`));
+  return {
+    dirs: [
+      userError ? { dir: '~/Library/LaunchAgents', files: null, error: userError } : { dir: '~/Library/LaunchAgents', files: made.slice(0, Math.ceil(third / 2)), error: null },
+      { dir: '/Library/LaunchAgents', files: [...made.slice(Math.ceil(third / 2)), 'com.apple.example.helper.plist'], error: null },
+      { dir: '/Library/LaunchDaemons', files: ['com.apple.example.daemon.plist'], error: null },
+    ],
+  };
+}
+
 /** A healthy, made-up Mac. Override pieces to trigger single rules. */
 function mac({
   uptimeDays = 3, pressure = 1, swapMB = 512, freePct = 40, diskFreePct = 50,
-  procs = [], therm = null, health = 95, battery = true, du = null,
+  procs = [], therm = null, health = 95, battery = true, du = null, startup = startupDirs(2),
 } = {}) {
   const boot = Math.floor(NOW / 1000) - Math.round(uptimeDays * DAY);
   const totalK = 1000000000; // ~1 TB in 1K blocks
@@ -45,6 +57,7 @@ function mac({
     ioreg_battery: battery ? `+-o AppleSmartBattery  <class AppleSmartBattery>\n    {\n      "BatteryInstalled" = Yes\n      "CycleCount" = 300\n      "DesignCapacity" = 5000\n      "AppleRawMaxCapacity" = ${Math.round(5000 * health / 100)}\n    }\n` : null,
     top,
     ps,
+    startup,
   };
   if (du) Object.assign(raw, du);
   return raw;
@@ -267,7 +280,7 @@ test('partly unknown (top missing): names what could not be checked and only the
   assert.equal(d.found, 0);
   for (const name of ['Enskild process med hög CPU', 'Spotlight', 'Värme (kernel_task)']) assert.equal(check(d, name).status, 'okänd', name);
   assert.match(d.summary, /bland det som gick att kontrollera/);
-  assert.match(d.summary, /Drifttid, minne och swap, ledig disk och batterihälsa ser bra ut\./);
+  assert.match(d.summary, /Drifttid, minne och swap, ledig disk, batterihälsa och startobjekt ser bra ut\./);
   assert.match(d.summary, /Kunde inte kontrollera: Enskild process med hög CPU, Spotlight och värme \(kernel_task\)\./);
   assert.doesNotMatch(d.summary, /processer, värme/);
   assert.match(d.advice, /ofullständigt/);
@@ -286,5 +299,79 @@ test('causes found while some checks are unknown: the summary says what could no
 
 test('a healthy Mac lists every check as fine', () => {
   const d = buildDiagnosis(mac(), { now: NOW });
-  assert.match(d.summary, /Drifttid, minne och swap, ledig disk, enskild process med hög CPU, Spotlight, värme \(kernel_task\) och batterihälsa ser bra ut\./);
+  assert.match(d.summary, /Drifttid, minne och swap, ledig disk, enskild process med hög CPU, Spotlight, värme \(kernel_task\), batterihälsa och startobjekt ser bra ut\./);
+});
+
+// ---------- Startobjekt (eighth check) ----------
+
+test('startup items: 20 from third parties give a cause with the count, at most 3 names and the two tips', () => {
+  const d = buildDiagnosis(mac({ startup: startupDirs(20) }), { now: NOW });
+  assert.deepEqual(ids(d), ['many_startup_items']);
+  const c = d.likely_causes[0];
+  assert.equal(c.numbers.third_party, 20);
+  assert.equal(c.numbers.apple, 2, 'Apple items are not counted as third party');
+  assert.match(c.evidence, /20 startobjekt från tredjepart \(gränsen är 15\)/);
+  assert.equal(c.numbers.examples.length, 3);
+  assert.match(c.actions.join(' '), /startup_items/);
+  assert.match(c.actions.join(' '), /Systeminställningar > Allmänt > Inloggningsobjekt/);
+  assert.equal(check(d, 'Startobjekt').status, 'utlöst');
+  // Boundary: 15 triggers, 14 does not.
+  assert.deepEqual(ids(buildDiagnosis(mac({ startup: startupDirs(15) }), { now: NOW })), ['many_startup_items']);
+  assert.deepEqual(ids(buildDiagnosis(mac({ startup: startupDirs(14) }), { now: NOW })), []);
+  // Ranked like the other rules: below memory, above a worn battery.
+  const many = buildDiagnosis(mac({ startup: startupDirs(20), pressure: 2, health: 70 }), { now: NOW });
+  assert.deepEqual(ids(many), ['memory_pressure', 'many_startup_items', 'worn_battery']);
+});
+
+test('startup items: 5 from third parties "ser bra ut"', () => {
+  const d = buildDiagnosis(mac({ startup: startupDirs(5) }), { now: NOW });
+  assert.equal(d.found, 0);
+  const c = check(d, 'Startobjekt');
+  assert.equal(c.status, 'ok');
+  assert.equal(c.value, '5 från tredjepart');
+  assert.match(summarizeDiagnosis(d), /Startobjekt \(5 från tredjepart\)/);
+});
+
+test('startup items: an unreadable list is "okänd", never "ser bra ut"', () => {
+  const denied = { dirs: ['~/Library/LaunchAgents', '/Library/LaunchAgents', '/Library/LaunchDaemons'].map((dir) => ({ dir, files: null, error: 'denied' })) };
+  for (const startup of [denied, undefined, null]) {
+    const raw = mac();
+    raw.startup = startup;
+    const d = buildDiagnosis(raw, { now: NOW });
+    assert.equal(check(d, 'Startobjekt').status, 'okänd');
+    assert.match(d.summary, /Kunde inte kontrollera: Startobjekt\./);
+    assert.doesNotMatch(d.summary, /startobjekt ser bra ut/i);
+  }
+  // One folder unreadable and few items in the rest: cannot say it looks fine either.
+  assert.equal(check(buildDiagnosis(mac({ startup: startupDirs(4, { userError: 'denied' }) }), { now: NOW }), 'Startobjekt').status, 'okänd');
+  // A folder that simply does not exist is normal, so the check still counts.
+  assert.equal(check(buildDiagnosis(mac({ startup: startupDirs(4, { userError: 'missing' }) }), { now: NOW }), 'Startobjekt').status, 'ok');
+});
+
+test('startup items privacy: no paths, no user names and at most 3 names in the output', () => {
+  const { scrub, scrubString } = require('../server/lib/privacy');
+  const ctx = { usernames: ['testuser'], hostnames: [] };
+  const files = [
+    ...Array.from({ length: 17 }, (_, i) => `com.exampleco.helper${i}.plist`),
+    'com.testuser.private.plist', '/Users/testuser/Library/LaunchAgents/DemoSync.plist', 'DemoSync.extra.plist',
+  ];
+  const raw = mac({ startup: { dirs: [{ dir: '~/Library/LaunchAgents', files, error: null }] } });
+  // Same as the server: scrub the data and the text with privacy.js before anything leaves.
+  const d = scrub(buildDiagnosis(raw, { now: NOW }), ctx);
+  const text = scrubString(summarizeDiagnosis(d), ctx);
+  const c = d.likely_causes.find((x) => x.kind === 'many_startup_items');
+  assert.ok(c, 'triggers with 20 items');
+  assert.ok(c.numbers.examples.length <= 3);
+  const out = JSON.stringify(d) + text;
+  assert.doesNotMatch(out, /testuser/);
+  assert.doesNotMatch(out, /\/Users\//);
+  assert.doesNotMatch(out, /LaunchAgents|LaunchDaemons/, 'no folder paths');
+  assert.doesNotMatch(out, /\.plist/, 'names only, not file names');
+  // At most three distinct startup names anywhere in the output.
+  const shown = new Set(out.match(/com\.exampleco\.helper\d+|DemoSync[\w.]*/g) || []);
+  assert.ok(shown.size <= 3, [...shown].join(', '));
+  // The rule itself (before the server's scrub) never lets a path through either.
+  const names = buildDiagnosis(mac({ startup: { dirs: [{ dir: '~/Library/LaunchAgents', files: ['/Users/testuser/x/DemoSync.plist', ...files.slice(0, 16)], error: null }] } }), { now: NOW })
+    .likely_causes[0].numbers.examples;
+  for (const n of names) assert.doesNotMatch(n, /\//);
 });

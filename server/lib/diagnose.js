@@ -8,8 +8,9 @@
 
 const p = require('./parse');
 const { buildOverview, GRADE, LIMITS } = require('./overview');
-const { buildTopProcesses, buildDiskReport } = require('./reports');
+const { buildTopProcesses, buildDiskReport, buildStartupItems } = require('./reports');
 const { explainProcess } = require('./explain');
+const { scrubString } = require('./privacy');
 
 // Thresholds for the rules, in one place.
 const RULES = {
@@ -20,6 +21,8 @@ const RULES = {
   spotlight_cpu_percent: 50, // mds_stores + mdworker* together, in top
   kernel_task_cpu_percent: 50,
   battery_health_percent: LIMITS.battery_health_bad_percent, // under 80 %
+  startup_third_party: 15, // at least 15 startup items not from Apple
+  startup_names_shown: 3,
   max_process_causes: 3,
 };
 
@@ -228,6 +231,44 @@ function batteryRule(o) {
   };
 }
 
+/**
+ * Startup items from third parties (launchd folders, read by collectStartup and parsed by
+ * buildStartupItems, the same as startup_items). Only a count and at most three names leave
+ * this rule: never folders, paths or user names.
+ */
+function startupName(label) {
+  // Defensive: a name is a file name, so keep only the last part and let privacy.js remove home paths.
+  const name = scrubString(String(label).split('/').pop());
+  return name.replace(/\s+/g, ' ').trim();
+}
+
+function startupRule(startup) {
+  if (!startup || !Array.isArray(startup.dirs) || !startup.dirs.length) return { status: 'okänd' };
+  const r = buildStartupItems(startup);
+  const readable = r.folders.some((f) => f.count !== null);
+  if (!readable) return { status: 'okänd' };
+  const third = r.items.filter((i) => i.maker === 'tredjepart');
+  // A folder that exists but could not be read may hide items, so a low count is not proof that all is fine.
+  const partly = startup.dirs.some((d) => !d.files && d.error !== 'missing');
+  if (third.length < RULES.startup_third_party) {
+    return partly ? { status: 'okänd' } : { status: 'ok', value: `${third.length} från tredjepart` };
+  }
+  const names = [...new Set(third.map((i) => startupName(i.label)).filter(Boolean))].slice(0, RULES.startup_names_shown);
+  return {
+    kind: 'many_startup_items',
+    score: 40 + Math.min(5, Math.floor((third.length - RULES.startup_third_party) / 10)),
+    severity: 'låg',
+    title: 'Många program startar automatiskt',
+    explanation: 'Många program från andra tillverkare än Apple startar av sig själva och ligger kvar i bakgrunden. Var och en tar lite minne och processorkraft, och tillsammans kan de göra att datorn startar långsamt och känns segare. Ofta är det rester från program som inte används längre.',
+    evidence: `${third.length} startobjekt från tredjepart (gränsen är ${RULES.startup_third_party}).${names.length ? ` Till exempel: ${names.join(', ')}.` : ''}`,
+    numbers: { third_party: third.length, apple: r.apple, limit: RULES.startup_third_party, examples: names },
+    actions: [
+      'Fråga efter startup_items för att se hela listan, märkt Apple eller tredjepart.',
+      'Stäng av det du inte behöver under Systeminställningar > Allmänt > Inloggningsobjekt, eller avinstallera programmet på vanligt sätt. Mac Health ändrar eller raderar aldrig något.',
+    ],
+  };
+}
+
 /** True when free disk is under the limit, so the caller knows whether to measure folders (du is slow). */
 function needsDiskFolders(dfText) {
   const d = p.parseDf(dfText);
@@ -237,12 +278,13 @@ function needsDiskFolders(dfText) {
 
 const CHECK_NAMES = {
   uptime: 'Drifttid', memory: 'Minne och swap', disk: 'Ledig disk', process: 'Enskild process med hög CPU',
-  spotlight: 'Spotlight', heat: 'Värme (kernel_task)', battery: 'Batterihälsa',
+  spotlight: 'Spotlight', heat: 'Värme (kernel_task)', battery: 'Batterihälsa', startup: 'Startobjekt',
 };
 
 /**
  * @param {object} raw  { sysctl, sw_vers, uptime, memory_pressure, vm_stat, df, pmset_batt, pmset_therm,
- *                        ioreg_battery, top, ps, du_stdout?, du_stderr?, home?, du_unfinished? }
+ *                        ioreg_battery, top, ps, startup?, du_stdout?, du_stderr?, home?, du_unfinished? }
+ *                      startup: { dirs } from collectStartup (missing or unreadable gives "okänd")
  * @param {object} opts { now, failures, duTimedOut }
  */
 function buildDiagnosis(raw = {}, { now = Date.now(), failures = {}, duTimedOut = false } = {}) {
@@ -261,8 +303,9 @@ function buildDiagnosis(raw = {}, { now = Date.now(), failures = {}, duTimedOut 
   const covered = new Set([...(results.spotlight.covers || []), ...(results.heat.covers || [])]);
   const proc = processRules(procs, covered);
   results.battery = batteryRule(o);
+  results.startup = startupRule(raw.startup);
 
-  let causes = [results.uptime, results.memory, results.disk, results.spotlight, results.heat, ...proc.causes, results.battery]
+  let causes = [results.uptime, results.memory, results.disk, results.spotlight, results.heat, ...proc.causes, results.battery, results.startup]
     .filter((c) => c && c.kind);
   causes.sort((a, b) => b.score - a.score);
   causes = causes.map(({ score, covers, ...c }, i) => ({ rank: i + 1, ...c }));

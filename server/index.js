@@ -30,7 +30,7 @@ const TOOLS = [
       'Finds the likely reasons why this Mac feels slow and ranks them, most likely first. Checks uptime (over 14 days), '
       + 'memory pressure and swap (over 2 GB, naming the apps using most memory), free disk (under 10 %, naming the largest home folders), '
       + 'single processes over 80 % CPU in two measurements (named and explained), Spotlight indexing, heat throttling (kernel_task) '
-      + 'and battery health (under 80 %). Each cause has a plain-Swedish explanation, the number behind it and what the user can do. '
+      + 'battery health (under 80 %) and startup items (15 or more from third parties, at most three names shown). Each cause has a plain-Swedish explanation, the number behind it and what the user can do. '
       + 'Use it first when the user asks why their Mac is slow. Takes a few seconds (longer only if the disk is nearly full). Read-only, local.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { title: 'Why is my Mac slow?', ...READ_ONLY },

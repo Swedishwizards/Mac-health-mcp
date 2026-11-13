@@ -80,16 +80,19 @@ test('collectDiagnose runs each command once and du only when the disk is nearly
   const listDir = () => [dirent('Library')];
   const count = (file) => calls.filter((c) => c.file === file).length;
 
-  const calm = await collectDiagnose({ runner, home: HOME, listDir, needFolders: () => false });
+  const readdir = (d) => (d.endsWith('/Library/LaunchAgents') ? ['com.exampleco.helper.plist'] : []);
+  const calm = await collectDiagnose({ runner, home: HOME, listDir, readdir, needFolders: () => false });
   assert.equal(count('/usr/bin/top'), 1, 'top -l 2 only once');
   assert.equal(count('/bin/ps'), 1);
   assert.equal(count('/bin/df'), 1);
   assert.equal(count('/usr/bin/du'), 0, 'no slow du when the disk is fine');
   assert.ok('top' in calm.raw && 'sysctl' in calm.raw);
   assert.equal(calm.raw.du_stdout, undefined);
+  assert.equal(calm.raw.startup.dirs.length, 3, 'startup folders are listed (readdir only, no command)');
+  assert.ok(calm.raw.startup.dirs.every((d) => !d.dir.includes('testuser')), 'home path replaced by ~');
 
   calls.length = 0;
-  const full = await collectDiagnose({ runner, home: HOME, listDir, needFolders: () => true });
+  const full = await collectDiagnose({ runner, home: HOME, listDir, readdir, needFolders: () => true });
   assert.equal(count('/bin/df'), 1, 'df is reused for du, not run twice');
   assert.equal(count('/usr/bin/du'), 1);
   assert.match(full.raw.du_stdout, /Library/);
@@ -103,7 +106,8 @@ for (const [what, answer, reason] of [
   test(`collectDiagnose + buildDiagnosis when every command is ${what}: no "ser bra ut"`, async () => {
     const { buildDiagnosis, summarizeDiagnosis } = require('../server/lib/diagnose');
     const runner = async () => answer;
-    const r = await collectDiagnose({ runner, needFolders: () => true });
+    const readdir = () => { throw Object.assign(new Error('denied'), { code: 'EPERM' }); };
+    const r = await collectDiagnose({ runner, readdir, needFolders: () => true });
     assert.ok(Object.keys(r.failures).length > 0);
     for (const why of Object.values(r.failures)) assert.equal(why, reason);
     const d = buildDiagnosis(r.raw, { failures: r.failures, duTimedOut: r.du_timed_out });

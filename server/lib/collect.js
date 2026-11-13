@@ -180,13 +180,13 @@ function collectStartup({ home, readdir } = {}) {
 }
 
 /**
- * Everything diagnose_slowness needs, each command run once: the overview commands and top/ps in
- * parallel (top -l 2 only once), then – only if needFolders(df) says the disk is nearly full – du over
+ * Everything diagnose_slowness needs, each command run once: the overview commands, top/ps and the
+ * startup folder listing (collectStartup, readdir only) in parallel (top -l 2 only once), then – only if needFolders(df) says the disk is nearly full – du over
  * the home folder, reusing the df output already read.
  */
-async function collectDiagnose({ runner = run, needFolders = () => false, home, listDir, duTimeoutMs } = {}) {
-  const [ov, pr] = await Promise.all([collectOverview({ runner }), collectProcesses({ runner })]);
-  const raw = { ...ov.raw, ...pr.raw };
+async function collectDiagnose({ runner = run, needFolders = () => false, home, listDir, readdir, duTimeoutMs } = {}) {
+  const [ov, pr, st] = await Promise.all([collectOverview({ runner }), collectProcesses({ runner }), collectStartup({ home, readdir })]);
+  const raw = { ...ov.raw, ...pr.raw, startup: st };
   const failures = { ...ov.failures, ...pr.failures };
   let duTimedOut = false;
   if (raw.df && needFolders(raw.df)) {

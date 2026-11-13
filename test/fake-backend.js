@@ -56,7 +56,7 @@ const fake = {
   // Same overview + top fixtures, ps with the %cpu column (made-up CPU values). No du: the disk fixture is not full.
   async collectDiagnose() {
     const { raw, failures } = await fake.collectOverview();
-    Object.assign(raw, { top: fx('top.txt'), ps: fx('ps-cpu.txt') });
+    Object.assign(raw, { top: fx('top.txt'), ps: fx('ps-cpu.txt'), startup: JSON.parse(fx('startup.json')) });
     return { raw, failures, du_timed_out: false };
   },
   async collectStartup() {

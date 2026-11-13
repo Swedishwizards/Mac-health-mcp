@@ -26,7 +26,7 @@
   "tools": [
     {
       "name": "diagnose_slowness",
-      "description": "Why is my Mac slow? Ranked likely causes (uptime, memory, disk, busy processes, Spotlight, heat, battery) with the numbers behind them and what to do."
+      "description": "Why is my Mac slow? Ranked likely causes (uptime, memory, disk, busy processes, Spotlight, heat, battery, startup items) with the numbers behind them and what to do."
     },
     {
       "name": "get_mac_overview",
