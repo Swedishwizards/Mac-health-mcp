@@ -201,8 +201,81 @@ function parseIoregBattery(text) {
   };
 }
 
+const SIZE_UNIT = { B: 1, K: 1024, M: 1024 ** 2, G: 1024 ** 3, T: 1024 ** 4 };
+
+/**
+ * `top -l 2 -o cpu -stats pid,cpu,mem` -> { cpu_usage, processes: [{ pid, cpu_percent, mem_bytes }] }.
+ * Only the LAST sample is used: the first sample of `top -l` has no CPU history and shows 0 %.
+ */
+function parseTop(text) {
+  if (typeof text !== 'string') return null;
+  const all = lines(text);
+  let header = -1;
+  for (let i = all.length - 1; i >= 0; i--) {
+    if (/^\s*PID\s+%CPU\s+MEM\b/.test(all[i])) { header = i; break; }
+  }
+  if (header === -1) return null;
+  let cpuUsage = null;
+  for (let i = header; i >= 0; i--) {
+    const m = all[i].match(/^CPU usage:\s*([\d.]+)% user,\s*([\d.]+)% sys,\s*([\d.]+)% idle/);
+    if (m) { cpuUsage = { user_percent: Number(m[1]), sys_percent: Number(m[2]), idle_percent: Number(m[3]) }; break; }
+  }
+  const processes = [];
+  for (const line of all.slice(header + 1)) {
+    const m = line.match(/^\s*(\d+)\s+([\d.]+)\s+([\d.]+)([BKMGT])[+-]?\s*$/);
+    if (m) processes.push({ pid: Number(m[1]), cpu_percent: Number(m[2]), mem_bytes: Math.round(Number(m[3]) * SIZE_UNIT[m[4]]) });
+  }
+  return { cpu_usage: cpuUsage, processes };
+}
+
+/**
+ * `ps -Axo pid=,comm=` -> Map pid -> { name, app }. Only the executable's base name and the
+ * app bundle name are kept, never the full path (which can contain the user name).
+ */
+function parsePs(text) {
+  const out = new Map();
+  for (const line of lines(text)) {
+    const m = line.match(/^\s*(\d+)\s+(.+?)\s*$/);
+    if (!m) continue;
+    const comm = m[2];
+    const name = comm.split('/').pop().replace(/^\((.*)\)$/, '$1');
+    const bundle = comm.match(/\/([^/]+)\.app\//);
+    out.set(Number(m[1]), { name: name || null, app: bundle ? bundle[1] : null });
+  }
+  return out;
+}
+
+/**
+ * `du -d 1 -k <home>` (+ stderr) -> { folders: [{ path, bytes }], total_bytes, denied, other_errors }.
+ * Paths are made relative to the home folder ("~/Library"); the home line itself becomes total_bytes.
+ */
+function parseDu(stdout, stderr, home) {
+  if (typeof stdout !== 'string' && typeof stderr !== 'string') return null;
+  const base = String(home || '').replace(/\/+$/, '');
+  const folders = [];
+  let total = null;
+  for (const line of lines(stdout)) {
+    const m = line.match(/^(\d+)\t(.+)$/);
+    if (!m) continue;
+    const bytes = Number(m[1]) * 1024;
+    const p = m[2].replace(/\/+$/, '');
+    if (base && p === base) { total = bytes; continue; }
+    const rel = base && p.startsWith(base + '/') ? '~/' + p.slice(base.length + 1) : null;
+    if (rel) folders.push({ path: rel, bytes });
+  }
+  let denied = 0;
+  let other = 0;
+  for (const line of lines(stderr)) {
+    if (!line.trim()) continue;
+    if (/Operation not permitted|Permission denied/i.test(line)) denied++;
+    else other++;
+  }
+  folders.sort((a, b) => b.bytes - a.bytes);
+  return { folders, total_bytes: total, denied, other_errors: other };
+}
+
 module.exports = {
   parseSysctl, parseBoottime, parseLoadavg, parseSwapusage, parseSwVers, parseUptime,
   parseMemoryPressure, parseVmStat, parseDf, parsePmsetBatt, parsePmsetTherm, parseIoregBattery,
-  IOREG_BATTERY_KEYS,
+  parseTop, parsePs, parseDu, IOREG_BATTERY_KEYS,
 };
