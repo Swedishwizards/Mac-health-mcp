@@ -4,7 +4,7 @@
   "display_name": "Mac Health",
   "version": "0.1.0",
   "description": "Ask Claude how your Mac is doing: CPU, memory, disk, battery, heat and uptime, each with a clear grade.",
-  "long_description": "Mac Health gives Claude a read-only health check of your Mac:\n\n- **get_mac_overview** – model, macOS version, uptime, CPU load, memory pressure, disk space, battery and thermal state, each graded Bra / Okej / Behöver åtgärd (Good / OK / Needs attention).\n- **top_processes** – what is using CPU and memory right now, with cryptic macOS names explained.\n- **memory_report** – memory pressure, swap and compression in plain language.\n- **disk_report** – free space and the largest folders in your home folder (read-only).\n\nEverything runs locally with built-in macOS tools (sysctl, sw_vers, vm_stat, memory_pressure, df, du, top, ps, pmset, ioreg). No internet access, no telemetry, no admin password, and serial numbers, UUIDs and user names are filtered out before anything reaches Claude.",
+  "long_description": "Mac Health gives Claude a read-only health check of your Mac:\n\n- **get_mac_overview** – model, macOS version, uptime, CPU load, memory pressure, disk space, battery and thermal state, each graded Bra / Okej / Behöver åtgärd (Good / OK / Needs attention).\n- **top_processes** – what is using CPU and memory right now, with cryptic macOS names explained.\n- **memory_report** – memory pressure, swap and compression in plain language.\n- **disk_report** – free space and the largest folders in your home folder (read-only).\n- **battery_report** – battery health, cycles and charging tips.\n- **thermal_status** – is the Mac throttling because of heat?\n- **startup_items** – what starts automatically, Apple or third party.\n\nEverything runs locally with built-in macOS tools (sysctl, sw_vers, vm_stat, memory_pressure, df, du, top, ps, pmset, ioreg). No internet access, no telemetry, no admin password, and serial numbers, UUIDs and user names are filtered out before anything reaches Claude.",
   "author": {
     "name": "Swedishwizards",
     "url": "https://github.com/Swedishwizards/mac-health-mcp"
@@ -39,6 +39,18 @@
     {
       "name": "disk_report",
       "description": "Free disk space with a warning when low, plus the largest folders in your home folder. Read-only, never deletes."
+    },
+    {
+      "name": "battery_report",
+      "description": "Battery health, charge cycles, charge state and tips, with a grade. Calm answer on Macs without a battery."
+    },
+    {
+      "name": "thermal_status",
+      "description": "Whether the Mac is slowing down because it is too hot (thermal throttling)."
+    },
+    {
+      "name": "startup_items",
+      "description": "What starts automatically (launch agents and daemons), marked Apple or third party. Lists only, never deletes."
     }
   ],
   "tools_generated": false,

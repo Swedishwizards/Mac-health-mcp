@@ -10,7 +10,7 @@
 
 const pkg = require('../package.json');
 const { ToolError } = require('./lib/exec');
-const { collectOverview, collectProcesses, collectMemory, collectDisk } = require('./lib/collect');
+const { collectOverview, collectProcesses, collectMemory, collectDisk, collectBattery, collectThermal, collectStartup } = require('./lib/collect');
 const reports = require('./lib/reports');
 const { buildOverview, summarizeOverview } = require('./lib/overview');
 const { scrub, localContext } = require('./lib/privacy');
@@ -71,6 +71,36 @@ const TOOLS = [
     annotations: { title: 'Disk report', ...READ_ONLY },
     handler: diskTool,
   },
+  {
+    name: 'battery_report',
+    title: 'Battery report',
+    description:
+      'Battery health (capacity compared to new), charge cycles, charge state, temperature and tips, with a grade. '
+      + 'Desktop Macs without a battery get a calm "no battery" answer. Serial numbers are never returned. Read-only.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { title: 'Battery report', ...READ_ONLY },
+    handler: batteryTool,
+  },
+  {
+    name: 'thermal_status',
+    title: 'Thermal status',
+    description:
+      'Whether macOS is slowing the processor down because the Mac is too hot (thermal throttling), with a grade and advice. '
+      + 'Use it when the Mac is hot, the fan is loud or it suddenly feels slow. Read-only.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { title: 'Thermal status', ...READ_ONLY },
+    handler: thermalTool,
+  },
+  {
+    name: 'startup_items',
+    title: 'Startup items',
+    description:
+      'What starts automatically: launch agents and daemons in ~/Library/LaunchAgents, /Library/LaunchAgents and /Library/LaunchDaemons, '
+      + 'each marked as Apple or third party. Only lists folder contents; never changes or deletes anything.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { title: 'Startup items', ...READ_ONLY },
+    handler: startupTool,
+  },
 ];
 
 function checkArgs(args, schema) {
@@ -121,7 +151,27 @@ async function diskTool() {
   return reports.buildDiskReport(raw, { failures, duTimedOut });
 }
 
+async function batteryTool() {
+  requireMac();
+  const { raw, failures } = await collectBattery();
+  return reports.buildBatteryReport(raw, { failures });
+}
+
+async function thermalTool() {
+  requireMac();
+  const { raw, failures } = await collectThermal();
+  return reports.buildThermalStatus(raw, { failures });
+}
+
+async function startupTool() {
+  requireMac();
+  return reports.buildStartupItems(await collectStartup());
+}
+
 const SUMMARIES = {
+  battery_report: reports.summarizeBatteryReport,
+  thermal_status: reports.summarizeThermalStatus,
+  startup_items: reports.summarizeStartupItems,
   get_mac_overview: summarizeOverview,
   top_processes: reports.summarizeTopProcesses,
   memory_report: reports.summarizeMemoryReport,
@@ -155,7 +205,7 @@ async function handle(req) {
         protocolVersion,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'mac-health', title: 'Mac Health', version: pkg.version },
-        instructions: 'Use get_mac_overview for a graded health check of this Mac (uptime, CPU, memory, disk, battery, heat). Dig deeper with top_processes (what is using CPU/memory), memory_report (pressure, swap, compression) and disk_report (free space, largest home folders). All tools are read-only and local.',
+        instructions: 'Use get_mac_overview for a graded health check of this Mac (uptime, CPU, memory, disk, battery, heat). Dig deeper with top_processes (what is using CPU/memory), memory_report (pressure, swap, compression) disk_report (free space, largest home folders), battery_report, thermal_status and startup_items (what starts automatically). All tools are read-only and local.',
       });
     }
     case 'ping':
