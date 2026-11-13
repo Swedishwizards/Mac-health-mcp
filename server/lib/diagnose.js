@@ -33,6 +33,11 @@ function sizeText(mb) {
   return mb >= 1024 ? `${round1(mb / 1024).toString().replace('.', ',')} GB` : `${mb} MB`;
 }
 const num = (n) => String(n).replace('.', ',');
+/** "a, b och c" with only the first word capitalised as in a sentence. */
+function listText(names) {
+  const lower = names.map((n, i) => (i === 0 ? n : n.charAt(0).toLowerCase() + n.slice(1)));
+  return lower.length > 1 ? `${lower.slice(0, -1).join(', ')} och ${lower[lower.length - 1]}` : lower[0] || '';
+}
 
 /** Joins top (CPU over ~1 s) with ps (name, app, CPU averaged over ~1 min) per pid. */
 function processList(raw) {
@@ -273,9 +278,23 @@ function buildDiagnosis(raw = {}, { now = Date.now(), failures = {}, duTimedOut 
   const unknown = checks.filter((c) => c.status === 'okänd').map((c) => c.check);
   if (unknown.length) notes.push(`Kunde inte kontrollera: ${unknown.join(', ')}.`);
 
-  const summary = causes.length
-    ? `Hittade ${causes.length} trolig${causes.length === 1 ? '' : 'a'} orsak${causes.length === 1 ? '' : 'er'} till att Macen kan kännas seg. Den mest troliga: ${causes[0].title.toLowerCase()}.`
-    : 'Hittade inget som tyder på att Macen borde vara seg just nu. Drifttid, minne, disk, processer, värme och batteri ser bra ut.';
+  const ok = checks.filter((c) => c.status === 'ok').map((c) => c.check);
+  const untested = unknown.length ? ` Kunde inte kontrollera: ${listText(unknown)}.` : '';
+  let summary;
+  let advice;
+  if (causes.length) {
+    summary = `Hittade ${causes.length} trolig${causes.length === 1 ? '' : 'a'} orsak${causes.length === 1 ? '' : 'er'} till att Macen kan kännas seg. Den mest troliga: ${causes[0].title.toLowerCase()}.${untested}`;
+    advice = 'Det här är troliga orsaker, inte säkra. Börja med den första. Mac Health ändrar, stänger eller raderar aldrig något.';
+  } else if (!ok.length) {
+    summary = 'Macen gick inte att undersöka just nu: inga av kontrollerna kunde göras, så det går inte att säga om något gör den seg.';
+    advice = 'Försök igen om en stund. Se anteckningarna för vad som inte gick att kontrollera.';
+  } else if (unknown.length) {
+    summary = `Hittade inget som tyder på att Macen borde vara seg bland det som gick att kontrollera. ${listText(ok)} ser bra ut.${untested}`;
+    advice = 'Allt kunde inte kontrolleras, så svaret är ofullständigt. Försök gärna igen om en stund. Känns datorn seg kan du också fråga efter top_processes när det händer.';
+  } else {
+    summary = `Hittade inget som tyder på att Macen borde vara seg just nu. ${listText(ok)} ser bra ut.`;
+    advice = 'Känns datorn ändå seg kan det vara ett enskilt program eller webbsidor. Fråga gärna efter top_processes när det händer.';
+  }
 
   return {
     checked_at: new Date(now).toISOString(),
@@ -283,9 +302,7 @@ function buildDiagnosis(raw = {}, { now = Date.now(), failures = {}, duTimedOut 
     summary,
     likely_causes: causes,
     checks,
-    advice: causes.length
-      ? 'Det här är troliga orsaker, inte säkra. Börja med den första. Mac Health ändrar, stänger eller raderar aldrig något.'
-      : 'Känns datorn ändå seg kan det vara ett enskilt program eller webbsidor. Fråga gärna efter top_processes när det händer.',
+    advice,
     notes,
   };
 }

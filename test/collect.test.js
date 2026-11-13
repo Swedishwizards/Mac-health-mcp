@@ -95,3 +95,23 @@ test('collectDiagnose runs each command once and du only when the disk is nearly
   assert.match(full.raw.du_stdout, /Library/);
   assert.equal(full.du_timed_out, false);
 });
+
+for (const [what, answer, reason] of [
+  ['missing', { code: -1, stdout: '', stderr: '', missing: true }, 'saknas på den här datorn'],
+  ['timed out', { code: -1, stdout: '', stderr: '', timedOut: true }, 'tog för lång tid'],
+]) {
+  test(`collectDiagnose + buildDiagnosis when every command is ${what}: no "ser bra ut"`, async () => {
+    const { buildDiagnosis, summarizeDiagnosis } = require('../server/lib/diagnose');
+    const runner = async () => answer;
+    const r = await collectDiagnose({ runner, needFolders: () => true });
+    assert.ok(Object.keys(r.failures).length > 0);
+    for (const why of Object.values(r.failures)) assert.equal(why, reason);
+    const d = buildDiagnosis(r.raw, { failures: r.failures, duTimedOut: r.du_timed_out });
+    assert.equal(d.found, 0);
+    for (const c of d.checks) assert.equal(c.status, 'okänd', c.check);
+    assert.match(d.summary, /gick inte att undersöka just nu/);
+    const text = summarizeDiagnosis(d);
+    assert.doesNotMatch(text, /ser bra ut/i);
+    assert.match(text, new RegExp(reason));
+  });
+}

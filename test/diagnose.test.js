@@ -247,3 +247,44 @@ test('dictionary explains the McAfee processes and other common background proce
   const { ENTRIES } = require('../server/lib/explain');
   for (const e of ENTRIES) assert.doesNotMatch(e.explain, /avinstallera|ta bort/i, e.label);
 });
+
+test('nothing could be checked: does not claim that anything looks fine', () => {
+  const d = buildDiagnosis({}, { now: NOW });
+  assert.equal(d.found, 0);
+  for (const c of d.checks) assert.equal(c.status, 'okänd', c.check);
+  assert.match(d.summary, /gick inte att undersöka just nu/);
+  assert.doesNotMatch(d.summary + d.advice, /ser bra ut/);
+  assert.match(d.advice, /Försök igen/);
+  const text = summarizeDiagnosis(d);
+  assert.doesNotMatch(text, /ser bra ut/i);
+  assert.match(text, /Kunde inte kontrollera: Drifttid/);
+});
+
+test('partly unknown (top missing): names what could not be checked and only the rest "ser bra ut"', () => {
+  const raw = mac();
+  delete raw.top;
+  const d = buildDiagnosis(raw, { now: NOW });
+  assert.equal(d.found, 0);
+  for (const name of ['Enskild process med hög CPU', 'Spotlight', 'Värme (kernel_task)']) assert.equal(check(d, name).status, 'okänd', name);
+  assert.match(d.summary, /bland det som gick att kontrollera/);
+  assert.match(d.summary, /Drifttid, minne och swap, ledig disk och batterihälsa ser bra ut\./);
+  assert.match(d.summary, /Kunde inte kontrollera: Enskild process med hög CPU, spotlight och värme \(kernel_task\)\./);
+  assert.doesNotMatch(d.summary, /processer, värme/);
+  assert.match(d.advice, /ofullständigt/);
+});
+
+test('causes found while some checks are unknown: the summary says what could not be checked', () => {
+  const raw = mac({ uptimeDays: 30 });
+  delete raw.top;
+  const d = buildDiagnosis(raw, { now: NOW });
+  assert.deepEqual(ids(d), ['long_uptime']);
+  assert.match(d.summary, /Hittade 1 trolig orsak/);
+  assert.match(d.summary, /Kunde inte kontrollera: Enskild process med hög CPU, spotlight och värme \(kernel_task\)\./);
+  const all = buildDiagnosis(mac({ uptimeDays: 30 }), { now: NOW });
+  assert.doesNotMatch(all.summary, /Kunde inte kontrollera/);
+});
+
+test('a healthy Mac lists every check as fine', () => {
+  const d = buildDiagnosis(mac(), { now: NOW });
+  assert.match(d.summary, /Drifttid, minne och swap, ledig disk, enskild process med hög CPU, spotlight, värme \(kernel_task\) och batterihälsa ser bra ut\./);
+});
