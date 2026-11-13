@@ -2,6 +2,20 @@
 
 Alla viktiga ändringar dokumenteras här. Formatet följer [Keep a Changelog](https://keepachangelog.com/) och projektet använder [semver](https://semver.org/).
 
+## [0.3.0] - Oreleasad (milstolpe 3)
+
+### Tillagt
+- `diagnose_slowness`: svarar på "varför är min Mac seg?". Sju regler (lång drifttid, minnestryck och swap, nästan full disk, enskild process med hög CPU, Spotlight-indexering, värmebromsning via kernel_task och sliten batterihälsa) ger rangordnade troliga orsaker, var och en med siffran bakom, förklaring och vad man kan göra. Alla kommandon körs en gång och delas mellan reglerna. CPU mäts med `top` (cirka 1 sekund) och `ps %cpu` (medel över cirka 1 minut), och en process räknas bara som hög om den ligger över gränsen i båda mätningarna. Diagnosen säger bara "ser bra ut" om de kontroller som faktiskt gick att göra; kontroller som inte gick att göra listas som okända. Resultatet kommer som text och JSON, utan identifierande uppgifter. Skrivskyddat.
+- Ordlistan `explain.js` utökad: McAfee och andra antivirusprogram, synk- och mötesappar (till exempel Zoom) samt vanliga macOS-bakgrundstjänster.
+- Fler tester (79 totalt), bland annat ett stdio-test för `diagnose_slowness` med fake-backend.
+
+### Ändrat
+- Drifttid: exakt 14 dagar ger inte längre Behöver åtgärd i `get_mac_overview`. Gränsen är mer än 14 dagar (rättat gränsfall).
+- `top_processes` och diagnosen läser även `%cpu` från `ps` för en längre CPU-mätning bredvid `top`.
+- Kosmetiskt: egennamnet Spotlight behåller versal i uppräkningen "Kunde inte kontrollera: ... och Spotlight ..." i diagnosens text.
+
+Status: ej släppt.
+
 ## [0.2.0] - Oreleasad (milstolpe 2)
 
 ### Tillagt

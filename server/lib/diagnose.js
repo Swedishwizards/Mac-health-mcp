@@ -33,9 +33,10 @@ function sizeText(mb) {
   return mb >= 1024 ? `${round1(mb / 1024).toString().replace('.', ',')} GB` : `${mb} MB`;
 }
 const num = (n) => String(n).replace('.', ',');
-/** "a, b och c" with only the first word capitalised as in a sentence. */
+/** "a, b och c" with only the first word capitalised as in a sentence; proper names (Spotlight) keep their capital. */
+const PROPER_NAMES = /^Spotlight/;
 function listText(names) {
-  const lower = names.map((n, i) => (i === 0 ? n : n.charAt(0).toLowerCase() + n.slice(1)));
+  const lower = names.map((n, i) => (i === 0 || PROPER_NAMES.test(n) ? n : n.charAt(0).toLowerCase() + n.slice(1)));
   return lower.length > 1 ? `${lower.slice(0, -1).join(', ')} och ${lower[lower.length - 1]}` : lower[0] || '';
 }
 
