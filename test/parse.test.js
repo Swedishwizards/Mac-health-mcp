@@ -75,6 +75,7 @@ test('pmset -g batt: laptop, desktop, charging', () => {
   assert.equal(ch.state, 'charged');
   assert.equal(ch.percent, 100);
   assert.equal(p.parsePmsetBatt(''), null);
+  assert.equal(p.parsePmsetBatt('something unexpected\n'), null);
 });
 
 test('pmset -g therm: none recorded and throttled', () => {

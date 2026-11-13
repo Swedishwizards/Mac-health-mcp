@@ -98,3 +98,43 @@ test('missing commands give "Okänd" parts, not a crash', async () => {
     child.kill();
   }
 });
+
+function rawExchange(lines, expected) {
+  const child = spawn(process.execPath, ['-r', FAKE, SERVER], { stdio: ['pipe', 'pipe', 'pipe'] });
+  return new Promise((resolve) => {
+    let buf = '';
+    child.stdout.on('data', (d) => {
+      buf += d;
+      const msgs = buf.split('\n').filter(Boolean);
+      if (msgs.length >= expected) { child.kill(); resolve(msgs.map((l) => JSON.parse(l))); }
+    });
+    for (const l of lines) child.stdin.write(l + '\n');
+  });
+}
+
+test('arguments named __proto__ or constructor are rejected', async () => {
+  const { child, call } = startServer();
+  try {
+    for (const k of ['__proto__', 'constructor', 'toString']) {
+      const res = await call('tools/call', { name: 'get_mac_overview', arguments: JSON.parse(`{"${k}": 1}`) });
+      assert.equal(res.result.isError, true, k);
+      assert.equal(res.result.structuredContent.code, 'invalid_arguments', k);
+    }
+  } finally {
+    child.kill();
+  }
+});
+
+test('invalid requests and an empty batch get -32600 Invalid Request', async () => {
+  const out = await rawExchange([
+    JSON.stringify({ id: 7, method: 'ping' }), // no jsonrpc
+    JSON.stringify({ jsonrpc: '1.0', id: 8, method: 'ping' }),
+    '[]',
+  ], 3);
+  const byId = (id) => out.find((m) => m.id === id);
+  assert.equal(byId(7).error.code, -32600);
+  assert.equal(byId(8).error.code, -32600);
+  const empty = out.find((m) => m.id === null);
+  assert.equal(empty.error.code, -32600);
+  assert.equal(empty.jsonrpc, '2.0');
+});

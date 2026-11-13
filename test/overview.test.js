@@ -107,3 +107,22 @@ test('formatDuration', () => {
   assert.equal(formatDuration(3600 * 2 + 60), '2 h 1 min');
   assert.equal(formatDuration(86400 + 3600), '1 dag 1 h');
 });
+
+test('battery: unreadable pmset and no ioreg gives Okänd, not "no battery"', () => {
+  const garbled = buildOverview({ pmset_batt: 'something unexpected\n', ioreg_battery: null }, { now: NOW });
+  assert.equal(garbled.battery.grade, GRADE.UNKNOWN);
+  assert.doesNotMatch(garbled.battery.summary, /Inget batteri/);
+  const desktop = buildOverview({ pmset_batt: "Now drawing from 'AC Power'\n", ioreg_battery: null }, { now: NOW });
+  assert.equal(desktop.battery.present, false);
+  assert.match(desktop.battery.summary, /Inget batteri/);
+});
+
+test('thermal: unreadable pmset -g therm gives Okänd with a readable text', () => {
+  const o = buildOverview({ pmset_therm: 'garbled output\n' }, { now: NOW });
+  assert.equal(o.thermal.grade, GRADE.UNKNOWN);
+  assert.match(o.thermal.summary, /Kunde inte tolka värmestatus/);
+  assert.doesNotMatch(o.thermal.summary, /\?/);
+  const warn = buildOverview({ pmset_therm: 'Note: Thermal warning level set to 1\n' }, { now: NOW });
+  assert.equal(warn.thermal.grade, GRADE.OK);
+  assert.equal(warn.thermal.summary, 'Värmevarningsnivå 1');
+});

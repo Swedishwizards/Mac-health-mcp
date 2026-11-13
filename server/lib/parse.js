@@ -129,8 +129,9 @@ function parseDf(text) {
 function parsePmsetBatt(text) {
   if (typeof text !== 'string' || !text.trim()) return null;
   const src = text.match(/drawing from '([^']+)'/);
-  const out = { power_source: src ? src[1] : null, present: false, percent: null, state: null, time_remaining_minutes: null };
   const line = lines(text).find((l) => /InternalBattery/.test(l));
+  if (!src && !line) return null; // unreadable output: say nothing rather than "no battery"
+  const out = { power_source: src ? src[1] : null, present: false, percent: null, state: null, time_remaining_minutes: null };
   if (!line) return out;
   out.present = !/present:\s*false/i.test(line);
   const pct = line.match(/(\d+)%/);

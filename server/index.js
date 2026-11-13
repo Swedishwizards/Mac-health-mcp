@@ -39,7 +39,7 @@ function checkArgs(args, schema) {
   if (args === undefined || args === null) return {};
   if (typeof args !== 'object' || Array.isArray(args)) throw new ToolError('Arguments must be an object.', { code: 'invalid_arguments' });
   for (const k of Object.keys(args)) {
-    if (!schema.properties[k]) throw new ToolError(`Unknown argument: ${k}`, { code: 'invalid_arguments' });
+    if (!Object.hasOwn(schema.properties, k)) throw new ToolError(`Unknown argument: ${k}`, { code: 'invalid_arguments' });
   }
   return args;
 }
@@ -64,7 +64,11 @@ function reply(id, result) { send({ jsonrpc: '2.0', id, result }); }
 function replyError(id, code, message) { send({ jsonrpc: '2.0', id, error: { code, message } }); }
 
 async function handle(req) {
-  if (!req || typeof req !== 'object' || req.jsonrpc !== '2.0') return;
+  if (!req || typeof req !== 'object' || Array.isArray(req) || req.jsonrpc !== '2.0' || typeof req.method !== 'string') {
+    // JSON-RPC 2.0: an invalid request object gets -32600, with its id if it has a usable one.
+    const rid = req && typeof req === 'object' && (typeof req.id === 'string' || typeof req.id === 'number') ? req.id : null;
+    return replyError(rid, -32600, 'Invalid Request');
+  }
   const { id, method, params } = req;
   const isRequest = id !== undefined && id !== null;
   if (!isRequest) return; // notifications (initialized, cancelled, ...) need no answer
@@ -132,6 +136,10 @@ function main() {
       let msg;
       try { msg = JSON.parse(line); } catch {
         send({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } });
+        continue;
+      }
+      if (Array.isArray(msg) && msg.length === 0) {
+        replyError(null, -32600, 'Invalid Request');
         continue;
       }
       const batch = Array.isArray(msg) ? msg : [msg];

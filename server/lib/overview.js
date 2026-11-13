@@ -208,6 +208,8 @@ function batterySection(battText, ioregText) {
   const io = p.parseIoregBattery(ioregText);
   if (!b && !io) return unknown('Kunde inte läsa batteriet (pmset, ioreg).');
   const present = Boolean((b && b.present) || (io && io.installed));
+  // "No battery" only when pmset clearly reports a power source without any battery and ioreg finds none.
+  if (!present && !(b && b.power_source && !io)) return unknown('Kunde inte avgöra om det finns ett batteri (pmset, ioreg).');
   if (!present) {
     return { grade: null, present: false, power_source: b ? b.power_source : null, summary: 'Inget batteri (stationär Mac).', advice: null };
   }
@@ -247,6 +249,9 @@ function batterySection(battText, ioregText) {
 function thermalSection(thermText, ioregText) {
   const t = p.parsePmsetTherm(thermText);
   if (!t) return unknown('Kunde inte läsa värmestatus (pmset -g therm).');
+  if (t.thermal_warning_level === null && t.performance_warning_level === null && t.cpu_speed_limit === null) {
+    return unknown('Kunde inte tolka värmestatus (pmset -g therm).');
+  }
   const io = p.parseIoregBattery(ioregText);
   const limit = t.cpu_speed_limit;
   let grade = GRADE.GOOD;
@@ -257,8 +262,6 @@ function thermalSection(thermText, ioregText) {
   } else if ((limit !== null && limit < 100) || (t.thermal_warning_level || 0) > 0 || (t.performance_warning_level || 0) > 0) {
     grade = GRADE.OK;
     advice = 'Macen har registrerat värmevarning och kan bromsa lite.';
-  } else if (t.thermal_warning_level === null && limit === null) {
-    grade = GRADE.UNKNOWN;
   }
   return {
     grade,
@@ -267,7 +270,9 @@ function thermalSection(thermText, ioregText) {
     cpu_speed_limit_percent: limit,
     battery_temperature_c: io ? io.temperature_c : null,
     summary: grade === GRADE.GOOD ? 'Ingen värmevarning – processorn bromsas inte.'
-      : limit !== null ? `Processorn begränsad till ${limit} %` : `Värmevarningsnivå ${t.thermal_warning_level ?? '?'}`,
+      : limit !== null && limit < 100 ? `Processorn begränsad till ${limit} %`
+        : (t.thermal_warning_level || 0) > 0 ? `Värmevarningsnivå ${t.thermal_warning_level}`
+          : `Prestandavarningsnivå ${t.performance_warning_level}`,
     advice,
   };
 }
