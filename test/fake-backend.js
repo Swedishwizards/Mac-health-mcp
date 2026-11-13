@@ -2,6 +2,10 @@
 // Preloaded with `node -r` in tests: replaces the command collector with fixture data
 // (made-up output in the same format as macOS), so the server can be tested on any OS.
 //   FAKE_MISSING=key1,key2  -> those commands behave as if missing
+//   FAKE_THROW=error|toolerror -> every collector throws (unexpected Error / ToolError with a hint);
+//                                 the message contains made-up identifiers that must be filtered out
+//   FAKE_LEAK=1             -> every tool result gets made-up identifiers added (keys and text),
+//                              to prove the privacy filter in server/index.js covers all tools
 const fs = require('node:fs');
 const path = require('node:path');
 const Module = require('node:module');
@@ -64,11 +68,51 @@ const fake = {
   },
 };
 
+// Made-up identifiers only (never real values from any machine).
+const LEAK_TEXT = ' [läcka: /Users/testuser/DemoApp/data.db, "Serial" = "FAKESERIAL000000", 00000000-1111-2222-3333-444444444444, aa:bb:cc:dd:ee:ff, testuser]';
+
+const throwMode = process.env.FAKE_THROW;
+if (throwMode) {
+  const { ToolError } = require('../server/lib/exec');
+  for (const k of Object.keys(fake)) {
+    fake[k] = async () => {
+      const msg = `boom in /Users/testuser/DemoApp ("Serial" = "FAKESERIAL000000")${LEAK_TEXT}`;
+      if (throwMode === 'toolerror') throw new ToolError(msg, { code: 'demo_failed', hint: 'Open /Users/testuser/DemoApp and try again.' });
+      throw new Error(msg);
+    };
+  }
+}
+
+function addLeak(result) {
+  if (!result || typeof result !== 'object') return result;
+  const out = { ...result,
+    serial_number: 'FAKESERIAL000000', hardware_uuid: '00000000-1111-2222-3333-444444444444', username: 'testuser',
+    home: '/Users/testuser', device_name: 'DemoApp-Mac', leak_note: LEAK_TEXT.trim() };
+  if (typeof out.summary === 'string') out.summary += LEAK_TEXT;
+  // get_mac_overview has one summary per part instead of a top-level one.
+  for (const [k, v] of Object.entries(out)) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.summary === 'string') out[k] = { ...v, summary: v.summary + LEAK_TEXT };
+  }
+  return out;
+}
+
+function wrapBuilders(mod) {
+  const wrapped = { ...mod };
+  for (const [k, fn] of Object.entries(mod)) {
+    if (/^build/.test(k) && typeof fn === 'function') wrapped[k] = (...a) => addLeak(fn(...a));
+  }
+  return wrapped;
+}
+
 // The server refuses to run off macOS; pretend to be a Mac inside the test process only.
 Object.defineProperty(process, 'platform', { value: 'darwin' });
 
 const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
-  if (/lib[\\/]collect$/.test(request) && parent && /server[\\/]index\.js$/.test(parent.filename)) return fake;
+  const fromServer = parent && /server[\\/]index\.js$/.test(parent.filename);
+  if (/lib[\\/]collect$/.test(request) && fromServer) return fake;
+  if (process.env.FAKE_LEAK === '1' && fromServer && /lib[\\/](reports|overview|diagnose)$/.test(request)) {
+    return wrapBuilders(origLoad.call(this, request, parent, isMain));
+  }
   return origLoad.call(this, request, parent, isMain);
 };
