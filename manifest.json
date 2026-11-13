@@ -1,0 +1,42 @@
+{
+  "manifest_version": "0.3",
+  "name": "mac-health",
+  "display_name": "Mac Health",
+  "version": "0.1.0",
+  "description": "Ask Claude how your Mac is doing: CPU, memory, disk, battery, heat and uptime, each with a clear grade.",
+  "long_description": "Mac Health gives Claude a read-only health check of your Mac:\n\n- **get_mac_overview** – model, macOS version, uptime, CPU load, memory pressure, disk space, battery and thermal state, each graded Bra / Okej / Behöver åtgärd (Good / OK / Needs attention).\n\nEverything runs locally with built-in macOS tools (sysctl, sw_vers, vm_stat, df, pmset, ioreg). No internet access, no telemetry, no admin password, and serial numbers, UUIDs and user names are filtered out before anything reaches Claude.",
+  "author": {
+    "name": "Swedishwizards",
+    "url": "https://github.com/Swedishwizards/mac-health-mcp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Swedishwizards/mac-health-mcp"
+  },
+  "homepage": "https://github.com/Swedishwizards/mac-health-mcp",
+  "support": "https://github.com/Swedishwizards/mac-health-mcp/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"]
+    }
+  },
+  "tools": [
+    {
+      "name": "get_mac_overview",
+      "description": "Health check of this Mac: model, macOS, uptime, CPU load, memory pressure, disk, battery and heat, each with a grade."
+    }
+  ],
+  "tools_generated": false,
+  "keywords": ["mac", "macos", "health", "performance", "slow", "memory", "disk", "battery", "thermal", "uptime"],
+  "license": "MIT",
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "name": "mac-health-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that lets Claude check your Mac's health (CPU, memory, disk, battery, heat, uptime) and explain why it might be slow. macOS only. Zero dependencies, local and read-only.",
+  "main": "server/index.js",
+  "bin": {
+    "mac-health-mcp": "server/index.js"
+  },
+  "files": [
+    "server/",
+    "manifest.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test",
+    "pack": "node scripts/pack.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "claude",
+    "claude-desktop",
+    "mcpb",
+    "macos",
+    "mac",
+    "system-health",
+    "performance",
+    "battery",
+    "memory-pressure",
+    "disk-space"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Swedishwizards/mac-health-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Swedishwizards/mac-health-mcp/issues"
+  },
+  "homepage": "https://github.com/Swedishwizards/mac-health-mcp#readme"
+}
