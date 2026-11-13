@@ -82,11 +82,14 @@ function collectMemory({ timeoutMs = 8000, runner = run } = {}) {
  * Output is shaped like `du -d 1 -k <home>` so parseDu can read it; the home "total" line is only
  * added when every folder was measured (it is the sum of the folders, files directly in ~ excluded).
  */
-async function collectDisk({ timeoutMs = 8000, duTimeoutMs = 20000, concurrency = 4, runner = run, home, listDir } = {}) {
+async function collectDisk({ timeoutMs = 8000, duTimeoutMs = 20000, concurrency = 4, runner = run, home, listDir, dfText } = {}) {
   const fs = require('node:fs');
   const path = require('node:path');
   const homeDir = home || require('node:os').homedir();
-  const { raw, failures } = await collectSet({ df: COMMANDS.df }, { timeoutMs, runner });
+  // dfText: df output the caller already has (diagnose_slowness), so df is not run twice.
+  const { raw, failures } = typeof dfText === 'string'
+    ? { raw: { df: dfText }, failures: {} }
+    : await collectSet({ df: COMMANDS.df }, { timeoutMs, runner });
   raw.home = homeDir;
 
   let dirs = [];
@@ -176,4 +179,23 @@ function collectStartup({ home, readdir } = {}) {
   return Promise.resolve({ dirs });
 }
 
-module.exports = { collectOverview, collectProcesses, collectMemory, collectDisk, collectBattery, collectThermal, collectStartup, COMMANDS, PROCESS_COMMANDS, MEMORY_COMMANDS };
+/**
+ * Everything diagnose_slowness needs, each command run once: the overview commands and top/ps in
+ * parallel (top -l 2 only once), then – only if needFolders(df) says the disk is nearly full – du over
+ * the home folder, reusing the df output already read.
+ */
+async function collectDiagnose({ runner = run, needFolders = () => false, home, listDir, duTimeoutMs } = {}) {
+  const [ov, pr] = await Promise.all([collectOverview({ runner }), collectProcesses({ runner })]);
+  const raw = { ...ov.raw, ...pr.raw };
+  const failures = { ...ov.failures, ...pr.failures };
+  let duTimedOut = false;
+  if (raw.df && needFolders(raw.df)) {
+    const d = await collectDisk({ runner, home, listDir, duTimeoutMs, dfText: raw.df });
+    Object.assign(raw, { du_stdout: d.raw.du_stdout, du_stderr: d.raw.du_stderr, home: d.raw.home, du_unfinished: d.raw.du_unfinished });
+    Object.assign(failures, d.failures);
+    duTimedOut = d.du_timed_out;
+  }
+  return { raw, failures, du_timed_out: duTimedOut };
+}
+
+module.exports = { collectDiagnose, collectOverview, collectProcesses, collectMemory, collectDisk, collectBattery, collectThermal, collectStartup, COMMANDS, PROCESS_COMMANDS, MEMORY_COMMANDS };

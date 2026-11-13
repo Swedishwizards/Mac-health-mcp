@@ -2,7 +2,7 @@
 // collectDisk with a fake runner: no real commands are run.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { collectDisk, collectProcesses } = require('../server/lib/collect');
+const { collectDisk, collectProcesses, collectDiagnose } = require('../server/lib/collect');
 
 const HOME = '/Users/testuser';
 const dirent = (name, dir = true) => ({ name, isDirectory: () => dir, isSymbolicLink: () => false });
@@ -67,4 +67,31 @@ test('collectDisk reports "saknas" when du itself is missing', async () => {
     : { code: 0, stdout: 'x\n', stderr: '' });
   const r = await collectDisk({ runner, home: HOME, listDir: () => [dirent('A')] });
   assert.equal(r.failures.du, 'saknas på den här datorn');
+});
+
+test('collectDiagnose runs each command once and du only when the disk is nearly full', async () => {
+  const disk = fakeRunner({ Library: 1000 });
+  const calls = [];
+  const runner = async (file, args, opts) => {
+    if (file === '/bin/df' || file === '/usr/bin/du') return disk.runner(file, args, opts).then((r) => { calls.push({ file }); return r; });
+    calls.push({ file });
+    return { code: 0, stdout: `${file} ok\n`, stderr: '' };
+  };
+  const listDir = () => [dirent('Library')];
+  const count = (file) => calls.filter((c) => c.file === file).length;
+
+  const calm = await collectDiagnose({ runner, home: HOME, listDir, needFolders: () => false });
+  assert.equal(count('/usr/bin/top'), 1, 'top -l 2 only once');
+  assert.equal(count('/bin/ps'), 1);
+  assert.equal(count('/bin/df'), 1);
+  assert.equal(count('/usr/bin/du'), 0, 'no slow du when the disk is fine');
+  assert.ok('top' in calm.raw && 'sysctl' in calm.raw);
+  assert.equal(calm.raw.du_stdout, undefined);
+
+  calls.length = 0;
+  const full = await collectDiagnose({ runner, home: HOME, listDir, needFolders: () => true });
+  assert.equal(count('/bin/df'), 1, 'df is reused for du, not run twice');
+  assert.equal(count('/usr/bin/du'), 1);
+  assert.match(full.raw.du_stdout, /Library/);
+  assert.equal(full.du_timed_out, false);
 });
