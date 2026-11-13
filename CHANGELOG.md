@@ -2,6 +2,15 @@
 
 Alla viktiga ändringar dokumenteras här. Formatet följer [Keep a Changelog](https://keepachangelog.com/) och projektet använder [semver](https://semver.org/).
 
+## [0.3.1] - Oreleasad (förbättring 1/5)
+
+### Tillagt
+- `diagnose_slowness`: åttonde kontrollen Startobjekt. Slår till vid 15 eller fler startobjekt från tredje part (inte Apple), visar antalet och högst tre namn (aldrig sökvägar eller användarnamn) och tipsar om `startup_items` samt Systeminställningar > Allmänt > Inloggningsobjekt. Kan listan inte läsas räknas kontrollen som okänd. Återanvänder insamlingen från `startup_items`, inga nya kommandon.
+- Fyra nya tester för Startobjekt-kontrollen (83 totalt).
+
+### Ändrat
+- `@anthropic-ai/mcpb` är låst till 2.1.2 i `scripts/pack.js` i stället för `@latest`.
+
 ## [0.3.0] - Oreleasad (milstolpe 3)
 
 ### Tillagt

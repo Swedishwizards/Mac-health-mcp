@@ -20,7 +20,7 @@ All tools are read-only and local.
 | `startup_items` | What starts automatically (launch agents and daemons), marked as Apple or third party. Only lists, never changes. |
 
 ### `diagnose_slowness`
-Answers "why is my Mac slow?" with a ranked list of likely causes, each with the number behind it, a plain explanation and what you can do. It checks seven things:
+Answers "why is my Mac slow?" with a ranked list of likely causes, each with the number behind it, a plain explanation and what you can do. It checks eight things:
 
 | Check | Triggers when |
 |---|---|
@@ -31,6 +31,7 @@ Answers "why is my Mac slow?" with a ranked list of likely causes, each with the
 | Spotlight | `mds_stores` and `mdworker` together over 50 % CPU |
 | Heat | `kernel_task` over 50 % CPU and at the same time a heat warning from macOS (`pmset -g therm` reports a thermal or performance warning, or a CPU speed limit under 100 %) |
 | Battery health | Under 80 % of new capacity |
+| Startup items | 15 or more from third parties (at most three names shown) |
 
 Every command runs once and is shared between the checks. It only says a check "looks good" if the check could actually be made; checks that could not run are listed as unknown. Causes are likely, not certain, and nothing is ever changed.
 
