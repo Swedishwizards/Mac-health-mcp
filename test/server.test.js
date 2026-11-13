@@ -42,7 +42,7 @@ test('MCP handshake, tools/list and get_mac_overview', async () => {
     notify('notifications/initialized');
 
     const list = await call('tools/list', {});
-    assert.deepEqual(list.result.tools.map((t) => t.name), ['get_mac_overview']);
+    assert.deepEqual(list.result.tools.map((t) => t.name), ['get_mac_overview', 'top_processes', 'memory_report', 'disk_report']);
     for (const t of list.result.tools) {
       assert.equal(t.annotations.readOnlyHint, true);
       assert.equal(t.annotations.openWorldHint, false);
@@ -137,4 +137,61 @@ test('invalid requests and an empty batch get -32600 Invalid Request', async () 
   const empty = out.find((m) => m.id === null);
   assert.equal(empty.error.code, -32600);
   assert.equal(empty.jsonrpc, '2.0');
+});
+
+test('top_processes, memory_report and disk_report over stdio', async () => {
+  const { child, call } = startServer();
+  try {
+    await call('initialize', { protocolVersion: '2025-06-18' });
+
+    const top = await call('tools/call', { name: 'top_processes', arguments: { limit: 3 } });
+    assert.equal(top.result.isError, false);
+    assert.equal(top.result.structuredContent.by_cpu.length, 3);
+    assert.equal(top.result.structuredContent.by_cpu[0].name, 'DemoAntivirusScanner');
+    assert.match(top.result.content[0].text, /^Processer: \[/);
+
+    const badLimit = await call('tools/call', { name: 'top_processes', arguments: { limit: 0 } });
+    assert.equal(badLimit.result.isError, true);
+    assert.equal(badLimit.result.structuredContent.code, 'invalid_arguments');
+
+    const mem = await call('tools/call', { name: 'memory_report', arguments: {} });
+    assert.equal(mem.result.isError, false);
+    assert.ok(mem.result.structuredContent.explanations.length >= 2);
+    assert.match(mem.result.content[0].text, /^Minne: \[/);
+
+    const disk = await call('tools/call', { name: 'disk_report', arguments: {} });
+    assert.equal(disk.result.isError, false);
+    assert.equal(disk.result.structuredContent.largest_home_folders[0].path, '~/Library');
+    assert.match(disk.result.content[0].text, /~\/Downloads/);
+
+    const everything = JSON.stringify([top.result, mem.result, disk.result]);
+    assert.doesNotMatch(everything, /\/Users\/|testuser|\/Applications\/|00000000-0000/);
+  } finally {
+    child.kill();
+  }
+});
+
+test('disk_report after a du timeout and top_processes without top still answer', async () => {
+  const { child, call } = startServer({ FAKE_DU_TIMEOUT: '1', FAKE_MISSING: 'top' });
+  try {
+    await call('initialize', { protocolVersion: '2024-11-05' });
+    const disk = await call('tools/call', { name: 'disk_report', arguments: {} });
+    assert.equal(disk.result.isError, false);
+    assert.equal(disk.result.structuredContent.home_scan_complete, false);
+    assert.ok(disk.result.structuredContent.largest_home_folders.length > 0);
+    assert.match(disk.result.content[0].text, /tog för lång tid/);
+    assert.deepEqual(disk.result.structuredContent.unmeasured_folders, ['~/Library']);
+
+    const top = await call('tools/call', { name: 'top_processes', arguments: {} });
+    assert.equal(top.result.isError, false);
+    assert.equal(top.result.structuredContent.grade, 'Okänd');
+  } finally {
+    child.kill();
+  }
+});
+
+test('manifest.json lists exactly the tools the server offers', () => {
+  const manifest = require('../manifest.json');
+  const { TOOLS } = require('../server/index.js');
+  assert.deepEqual(manifest.tools.map((t) => t.name), TOOLS.map((t) => t.name));
 });
