@@ -95,8 +95,9 @@ async function collectDisk({ timeoutMs = 8000, duTimeoutMs = 20000, concurrency 
     dirs = entries.filter((e) => e.isDirectory() && !e.isSymbolicLink()).map((e) => path.join(homeDir, e.name));
   } catch (e) {
     raw.du_stdout = '';
-    raw.du_stderr = e && e.code === 'EPERM' ? `du: ${homeDir}: Operation not permitted\n` : '';
-    failures.du = 'misslyckades';
+    const denied = e && (e.code === 'EPERM' || e.code === 'EACCES');
+    raw.du_stderr = denied ? `du: ${homeDir}: Operation not permitted\n` : '';
+    failures.du = denied ? 'nekades åtkomst till hemkatalogen' : e && e.code === 'ENOENT' ? 'hittade ingen hemkatalog' : 'misslyckades';
     return { raw, failures, du_timed_out: false };
   }
 
@@ -105,6 +106,7 @@ async function collectDisk({ timeoutMs = 8000, duTimeoutMs = 20000, concurrency 
   const err = [];
   const unfinished = [];
   let timedOut = false;
+  let lastFailure = null;
   let next = 0;
   async function worker() {
     while (next < dirs.length) {
@@ -114,6 +116,7 @@ async function collectDisk({ timeoutMs = 8000, duTimeoutMs = 20000, concurrency 
       const r = await runner('/usr/bin/du', ['-s', '-k', '-x', dir], { timeoutMs: left, env: ENV });
       if (r.timedOut) { timedOut = true; unfinished.push(dir); continue; }
       if (r.stdout && r.stdout.trim()) out.push(r.stdout.trim());
+      else lastFailure = r;
       if (r.stderr && r.stderr.trim()) err.push(r.stderr.trim());
     }
   }
@@ -127,7 +130,7 @@ async function collectDisk({ timeoutMs = 8000, duTimeoutMs = 20000, concurrency 
   raw.du_stderr = err.length ? err.join('\n') + '\n' : '';
   // Only "~/name" leaves this module, never the real home path.
   raw.du_unfinished = unfinished.map((d) => `~/${path.basename(d)}`).sort();
-  if (!out.length && dirs.length) failures.du = timedOut ? 'tog för lång tid' : 'misslyckades';
+  if (!out.length && dirs.length) failures.du = timedOut ? 'tog för lång tid' : lastFailure ? failReason(lastFailure) : 'misslyckades';
   return { raw, failures, du_timed_out: timedOut };
 }
 

@@ -48,7 +48,7 @@ test('collectDisk handles an unreadable home folder', async () => {
   const { runner } = fakeRunner({});
   const listDir = () => { const e = new Error('nope'); e.code = 'EPERM'; throw e; };
   const r = await collectDisk({ runner, home: HOME, listDir });
-  assert.equal(r.failures.du, 'misslyckades');
+  assert.equal(r.failures.du, 'nekades åtkomst till hemkatalogen');
   assert.match(r.raw.du_stderr, /Operation not permitted/);
 });
 
@@ -59,4 +59,12 @@ test('collectProcesses runs top twice-sampled and ps without a shell', async () 
   const top = calls.find(([f]) => f === '/usr/bin/top');
   assert.deepEqual(top[1].slice(0, 2), ['-l', '2']);
   assert.ok(calls.some(([f]) => f === '/bin/ps'));
+});
+
+test('collectDisk reports "saknas" when du itself is missing', async () => {
+  const runner = async (file) => (file === '/usr/bin/du'
+    ? { code: -1, stdout: '', stderr: '', missing: true }
+    : { code: 0, stdout: 'x\n', stderr: '' });
+  const r = await collectDisk({ runner, home: HOME, listDir: () => [dirent('A')] });
+  assert.equal(r.failures.du, 'saknas på den här datorn');
 });
