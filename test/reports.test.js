@@ -41,10 +41,17 @@ test('parsePs keeps only base name and app bundle, never the path', () => {
   const m = p.parsePs(fx('ps.txt'));
   assert.equal(m.get(158).name, 'WindowServer');
   assert.equal(m.get(158).app, null);
-  assert.deepEqual(m.get(5288), { name: 'DemoBrowser Helper (Renderer)', app: 'DemoBrowser' });
+  assert.deepEqual(m.get(5288), { name: 'DemoBrowser Helper (Renderer)', app: 'DemoBrowser', cpu_percent: null });
   const user = m.get(8433); // lives under /Users/testuser/...
   assert.equal(user.name, 'demotool');
   assert.doesNotMatch(JSON.stringify([...m.values()]), /\/|testuser/);
+});
+
+test('parsePs reads the optional %cpu column (pid=,%cpu=,comm=)', () => {
+  const m = p.parsePs('    1   0.3 /sbin/launchd\n  500 164.6 /usr/local/Exempel/bin/Exempeld\n  501   2,5 /Applications/Demo.app/Contents/MacOS/Demo Helper\n');
+  assert.deepEqual(m.get(1), { name: 'launchd', app: null, cpu_percent: 0.3 });
+  assert.deepEqual(m.get(500), { name: 'Exempeld', app: null, cpu_percent: 164.6 });
+  assert.deepEqual(m.get(501), { name: 'Demo Helper', app: 'Demo', cpu_percent: 2.5 });
 });
 
 test('parseDu turns paths into ~/..., counts protected folders and finds the total', () => {

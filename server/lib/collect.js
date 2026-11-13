@@ -57,7 +57,7 @@ async function collectSet(commands, { timeoutMs, runner }) {
 // top needs two samples (about one second apart) to give real CPU numbers.
 const PROCESS_COMMANDS = {
   top: ['/usr/bin/top', ['-l', '2', '-o', 'cpu', '-n', '400', '-stats', 'pid,cpu,mem']],
-  ps: ['/bin/ps', ['-Axo', 'pid=,comm=']],
+  ps: ['/bin/ps', ['-Axo', 'pid=,%cpu=,comm=']],
 };
 
 const MEMORY_COMMANDS = {

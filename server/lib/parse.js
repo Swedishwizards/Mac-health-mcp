@@ -229,18 +229,26 @@ function parseTop(text) {
 }
 
 /**
- * `ps -Axo pid=,comm=` -> Map pid -> { name, app }. Only the executable's base name and the
- * app bundle name are kept, never the full path (which can contain the user name).
+ * `ps -Axo pid=,%cpu=,comm=` (or the older `pid=,comm=`) -> Map pid -> { name, app, cpu_percent }.
+ * Only the executable's base name and the app bundle name are kept, never the full path
+ * (which can contain the user name). ps always prints %cpu with a decimal point ("0.0"), which is
+ * how the optional column is told apart from the command; cpu_percent is null without it.
+ * ps's %cpu is a decaying average over roughly the last minute, so it is a second, longer
+ * measurement next to top's one-second sample.
  */
 function parsePs(text) {
   const out = new Map();
   for (const line of lines(text)) {
-    const m = line.match(/^\s*(\d+)\s+(.+?)\s*$/);
+    const m = line.match(/^\s*(\d+)\s+(?:(\d+[.,]\d+)\s+)?(.+?)\s*$/);
     if (!m) continue;
-    const comm = m[2];
+    const comm = m[3];
     const name = comm.split('/').pop().replace(/^\((.*)\)$/, '$1');
     const bundle = comm.match(/\/([^/]+)\.app\//);
-    out.set(Number(m[1]), { name: name || null, app: bundle ? bundle[1] : null });
+    out.set(Number(m[1]), {
+      name: name || null,
+      app: bundle ? bundle[1] : null,
+      cpu_percent: m[2] !== undefined ? Number(m[2].replace(',', '.')) : null,
+    });
   }
   return out;
 }
