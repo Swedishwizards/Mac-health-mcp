@@ -5,7 +5,7 @@
  */
 
 const p = require('./parse');
-const { memorySection, diskSection, GRADE, LIMITS, toGB } = require('./overview');
+const { memorySection, diskSection, batterySection, thermalSection, GRADE, LIMITS, toGB } = require('./overview');
 const { explainProcess } = require('./explain');
 
 const MB = 1024 ** 2;
@@ -180,7 +180,115 @@ function summarizeDiskReport(r) {
   return out.join('\n');
 }
 
+// ---------- battery_report ----------
+
+function buildBatteryReport(raw = {}, { failures = {} } = {}) {
+  const b = batterySection(raw.pmset_batt, raw.ioreg_battery);
+  const notes = notesFrom(failures);
+  if (b.present === false) {
+    return { ...b, summary: 'Den här Macen har inget batteri (stationär Mac), så det finns inget att kontrollera.', tips: [], notes };
+  }
+  const tips = [];
+  if (b.present) {
+    tips.push('Batterihälsa är hur mycket batteriet rymmer jämfört med när det var nytt. Under 80 % rekommenderar Apple service.');
+    tips.push('Låt "Optimerad batteriladdning" vara på (Systeminställningar > Batteri) så slits batteriet långsammare.');
+    if (typeof b.temperature_c === 'number' && b.temperature_c >= 35) tips.push(`Batteriet är ${b.temperature_c} °C. Värme sliter på batteriet – undvik att ladda i solen eller under täcke.`);
+    if (typeof b.cycle_count === 'number') tips.push(`${b.cycle_count} laddcykler. Moderna MacBook-batterier är byggda för 1000 cykler.`);
+  }
+  return { ...b, tips, notes };
+}
+
+function summarizeBatteryReport(r) {
+  const out = [`Batteri: ${r.grade ? `[${r.grade}] ` : ''}${r.summary}`];
+  if (r.advice) out.push(`→ ${r.advice}`);
+  for (const t of r.tips || []) out.push(`- ${t}`);
+  for (const n of r.notes || []) out.push(`Obs: ${n}`);
+  return out.join('\n');
+}
+
+// ---------- thermal_status ----------
+
+function buildThermalStatus(raw = {}, { failures = {} } = {}) {
+  const t = thermalSection(raw.pmset_therm, raw.ioreg_battery);
+  const throttled = typeof t.cpu_speed_limit_percent === 'number' ? t.cpu_speed_limit_percent < 100 : null;
+  return {
+    ...t,
+    throttled,
+    explanation: 'När en Mac blir för varm sänker macOS processorns hastighet för att kyla ner den ("strypning"). Då känns datorn långsam.',
+    notes: notesFrom(failures),
+  };
+}
+
+function summarizeThermalStatus(r) {
+  const out = [`Värme: [${r.grade}] ${r.summary}`];
+  if (r.advice) out.push(`→ ${r.advice}`);
+  out.push(r.explanation);
+  for (const n of r.notes || []) out.push(`Obs: ${n}`);
+  return out.join('\n');
+}
+
+// ---------- startup_items ----------
+
+const DIR_ERROR_SV = { missing: 'finns inte (helt normalt)', denied: 'kunde inte läsas (macOS nekade åtkomst)', failed: 'kunde inte läsas' };
+const DIR_KIND = {
+  '~/Library/LaunchAgents': 'startar när du loggar in (bara för dig)',
+  '/Library/LaunchAgents': 'startar när någon loggar in',
+  '/Library/LaunchDaemons': 'startar med datorn, i bakgrunden',
+};
+
+/** @param {{dirs: Array<{dir: string, files: string[]|null, error: string|null}>}} raw */
+function buildStartupItems(raw = {}) {
+  const items = [];
+  const folders = [];
+  const notes = [];
+  for (const d of (raw && raw.dirs) || []) {
+    if (!d.files) {
+      folders.push({ folder: d.dir, count: null, status: DIR_ERROR_SV[d.error] || DIR_ERROR_SV.failed });
+      if (d.error !== 'missing') notes.push(`${d.dir} ${DIR_ERROR_SV[d.error] || DIR_ERROR_SV.failed}.`);
+      continue;
+    }
+    const plists = d.files.filter((f) => /\.plist$/i.test(f) && !f.startsWith('.')).map((f) => f.split('/').pop()).sort();
+    folders.push({ folder: d.dir, count: plists.length, status: 'läst' });
+    for (const file of plists) {
+      const label = file.replace(/\.plist$/i, '');
+      const apple = /^com\.apple\./i.test(label);
+      items.push({ label, file, folder: d.dir, when: DIR_KIND[d.dir] || null, maker: apple ? 'Apple' : 'tredjepart' });
+    }
+  }
+  const third = items.filter((i) => i.maker === 'tredjepart').length;
+  const apple = items.length - third;
+  const readable = folders.some((f) => f.count !== null || f.status === DIR_ERROR_SV.missing);
+  return {
+    total: items.length,
+    third_party: third,
+    apple,
+    folders,
+    items,
+    summary: readable ? `${items.length} saker startar automatiskt: ${third} från tredjepart, ${apple} från Apple.` : 'Kunde inte läsa startmapparna.',
+    advice: third
+      ? 'Tredjepartsposter kan vara rester från program du inte längre använder. Kontrollera i Systeminställningar > Allmänt > Inloggningsobjekt och tillägg, eller avinstallera programmet på vanligt sätt. Ta inte bort filer för hand om du är osäker.'
+      : null,
+    notes,
+  };
+}
+
+function summarizeStartupItems(r) {
+  const out = [`Autostart: ${r.summary}`];
+  for (const f of r.folders) {
+    const list = r.items.filter((i) => i.folder === f.folder);
+    out.push(`${f.folder}: ${f.count === null ? f.status : `${f.count} st`}${DIR_KIND[f.folder] ? ` – ${DIR_KIND[f.folder]}` : ''}`);
+    for (const i of list) out.push(`  - ${i.label} (${i.maker})`);
+  }
+  if (r.advice) out.push(`→ ${r.advice}`);
+  out.push('Verktyget läser bara listorna och ändrar eller raderar aldrig något.');
+  for (const n of r.notes || []) out.push(`Obs: ${n}`);
+  return out.join('\n');
+}
+
 module.exports = {
+  buildBatteryReport, summarizeBatteryReport,
+  buildThermalStatus, summarizeThermalStatus,
+  buildStartupItems, summarizeStartupItems,
   buildTopProcesses, summarizeTopProcesses,
   buildMemoryReport, summarizeMemoryReport,
   buildDiskReport, summarizeDiskReport,

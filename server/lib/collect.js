@@ -134,4 +134,46 @@ async function collectDisk({ timeoutMs = 8000, duTimeoutMs = 20000, concurrency 
   return { raw, failures, du_timed_out: timedOut };
 }
 
-module.exports = { collectOverview, collectProcesses, collectMemory, collectDisk, COMMANDS, PROCESS_COMMANDS, MEMORY_COMMANDS };
+function collectBattery({ timeoutMs = 8000, runner = run } = {}) {
+  return collectSet({ pmset_batt: COMMANDS.pmset_batt, ioreg_battery: COMMANDS.ioreg_battery }, { timeoutMs, runner })
+    .then(dropEmptyIoreg);
+}
+
+function collectThermal({ timeoutMs = 8000, runner = run } = {}) {
+  return collectSet({ pmset_therm: COMMANDS.pmset_therm, ioreg_battery: COMMANDS.ioreg_battery }, { timeoutMs, runner })
+    .then(dropEmptyIoreg);
+}
+
+// ioreg prints nothing on Macs without a battery – that is not an error worth a note.
+function dropEmptyIoreg(res) {
+  if (res.failures.ioreg_battery === 'misslyckades') delete res.failures.ioreg_battery;
+  return res;
+}
+
+/**
+ * Lists (readdir only, never reads or changes the files) the launchd folders that start things
+ * automatically. Returns { dirs: [{ dir: '~/Library/LaunchAgents' | '/Library/...', files: [...] | null, error }] }.
+ * The home path is replaced by "~" here, so it never leaves this module.
+ */
+function collectStartup({ home, readdir } = {}) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const homeDir = home || require('node:os').homedir();
+  const list = readdir || ((d) => fs.readdirSync(d));
+  const targets = [
+    [path.join(homeDir, 'Library', 'LaunchAgents'), '~/Library/LaunchAgents'],
+    ['/Library/LaunchAgents', '/Library/LaunchAgents'],
+    ['/Library/LaunchDaemons', '/Library/LaunchDaemons'],
+  ];
+  const dirs = targets.map(([real, shown]) => {
+    try {
+      return { dir: shown, files: list(real).map(String), error: null };
+    } catch (e) {
+      const code = e && e.code;
+      return { dir: shown, files: null, error: code === 'ENOENT' ? 'missing' : code === 'EPERM' || code === 'EACCES' ? 'denied' : 'failed' };
+    }
+  });
+  return Promise.resolve({ dirs });
+}
+
+module.exports = { collectOverview, collectProcesses, collectMemory, collectDisk, collectBattery, collectThermal, collectStartup, COMMANDS, PROCESS_COMMANDS, MEMORY_COMMANDS };
