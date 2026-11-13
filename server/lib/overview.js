@@ -330,4 +330,4 @@ function summarizeOverview(o) {
   return out.join('\n');
 }
 
-module.exports = { buildOverview, summarizeOverview, GRADE, LIMITS, formatDuration };
+module.exports = { buildOverview, summarizeOverview, memorySection, diskSection, GRADE, LIMITS, formatDuration, toGB };
