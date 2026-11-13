@@ -42,7 +42,7 @@ test('MCP handshake, tools/list and get_mac_overview', async () => {
     notify('notifications/initialized');
 
     const list = await call('tools/list', {});
-    assert.deepEqual(list.result.tools.map((t) => t.name), ['get_mac_overview', 'top_processes', 'memory_report', 'disk_report']);
+    assert.deepEqual(list.result.tools.map((t) => t.name), ['get_mac_overview', 'top_processes', 'memory_report', 'disk_report', 'battery_report', 'thermal_status', 'startup_items']);
     for (const t of list.result.tools) {
       assert.equal(t.annotations.readOnlyHint, true);
       assert.equal(t.annotations.openWorldHint, false);
@@ -194,4 +194,37 @@ test('manifest.json lists exactly the tools the server offers', () => {
   const manifest = require('../manifest.json');
   const { TOOLS } = require('../server/index.js');
   assert.deepEqual(manifest.tools.map((t) => t.name), TOOLS.map((t) => t.name));
+});
+
+test('battery_report, thermal_status and startup_items over stdio', async () => {
+  const { child, call } = startServer();
+  try {
+    await call('initialize', { protocolVersion: '2025-06-18' });
+    const bat = await call('tools/call', { name: 'battery_report', arguments: {} });
+    assert.equal(bat.result.isError, false);
+    assert.equal(bat.result.structuredContent.cycle_count, 112);
+    const th = await call('tools/call', { name: 'thermal_status', arguments: {} });
+    assert.equal(th.result.isError, false);
+    assert.match(th.result.content[0].text, /^Värme: \[/);
+    const st = await call('tools/call', { name: 'startup_items', arguments: {} });
+    assert.equal(st.result.isError, false);
+    assert.ok(st.result.structuredContent.total > 0);
+    assert.match(st.result.content[0].text, /~\/Library\/LaunchAgents/);
+    assert.doesNotMatch(JSON.stringify([bat.result, th.result, st.result]), /\/Users\/|"serial|FAKESERIAL|XX0000/i);
+  } finally {
+    child.kill();
+  }
+});
+
+test('battery_report on a Mac without battery over stdio', async () => {
+  const { child, call } = startServer({ FAKE_NO_BATTERY: '1' });
+  try {
+    await call('initialize', { protocolVersion: '2025-06-18' });
+    const bat = await call('tools/call', { name: 'battery_report', arguments: {} });
+    assert.equal(bat.result.isError, false);
+    assert.equal(bat.result.structuredContent.present, false);
+    assert.match(bat.result.content[0].text, /inget batteri/);
+  } finally {
+    child.kill();
+  }
 });

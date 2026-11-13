@@ -45,6 +45,17 @@ const fake = {
       du_timed_out: timedOut,
     };
   },
+  //   FAKE_NO_BATTERY=1 -> a desktop Mac (pmset reports AC power only, ioreg finds nothing)
+  async collectBattery() {
+    if (process.env.FAKE_NO_BATTERY === '1') return { raw: { pmset_batt: "Now drawing from 'AC Power'\n", ioreg_battery: null }, failures: {} };
+    return { raw: { pmset_batt: fx('pmset-batt.txt'), ioreg_battery: fx('ioreg-battery.txt') }, failures: {} };
+  },
+  async collectThermal() {
+    return { raw: { pmset_therm: fx('pmset-therm.txt'), ioreg_battery: fx('ioreg-battery.txt') }, failures: {} };
+  },
+  async collectStartup() {
+    return JSON.parse(fx('startup.json'));
+  },
 };
 
 // The server refuses to run off macOS; pretend to be a Mac inside the test process only.
