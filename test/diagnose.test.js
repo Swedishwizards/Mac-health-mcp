@@ -74,6 +74,16 @@ test('uptime: over 14 days triggers, 14 days does not', () => {
   assert.deepEqual(ids(buildDiagnosis(mac({ uptimeDays: 14 }), { now: NOW })), []);
 });
 
+test('uptime boundary: 14,0 days agrees with get_mac_overview (neither flags it), 14,1 days both do', () => {
+  const { buildOverview, GRADE } = require('../server/lib/overview');
+  const at14 = mac({ uptimeDays: 14 });
+  assert.equal(buildOverview(at14, { now: NOW }).uptime.grade, GRADE.OK);
+  assert.deepEqual(ids(buildDiagnosis(at14, { now: NOW })), []);
+  const at141 = mac({ uptimeDays: 14.1 });
+  assert.equal(buildOverview(at141, { now: NOW }).uptime.grade, GRADE.BAD);
+  assert.deepEqual(ids(buildDiagnosis(at141, { now: NOW })), ['long_uptime']);
+});
+
 test('memory: warning pressure or swap over 2 GB triggers and names the apps using most memory', () => {
   const big = [{ pid: 200, name: '/Applications/Webbläsare.app/Contents/MacOS/Webbläsare', top: 2, ps: 2, mem: '3G' }];
   const warn = buildDiagnosis(mac({ pressure: 2, procs: big }), { now: NOW });

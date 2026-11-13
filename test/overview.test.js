@@ -126,3 +126,10 @@ test('thermal: unreadable pmset -g therm gives Okänd with a readable text', () 
   assert.equal(warn.thermal.grade, GRADE.OK);
   assert.equal(warn.thermal.summary, 'Värmevarningsnivå 1');
 });
+
+test('uptime: exactly 14 days is not "Behöver åtgärd", over 14 days is (plan: "> 14 dagar")', () => {
+  const at = (days) => buildOverview({ sysctl: 'kern.boottime: { sec = 1000, usec = 0 } x\n' }, { now: (1000 + Math.round(days * 86400)) * 1000 });
+  assert.equal(at(14).uptime.uptime_days, 14);
+  assert.equal(at(14).uptime.grade, GRADE.OK);
+  assert.equal(at(14.1).uptime.grade, GRADE.BAD);
+});

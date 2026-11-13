@@ -13,7 +13,7 @@ const RANK = { [GRADE.GOOD]: 0, [GRADE.OK]: 1, [GRADE.BAD]: 2 };
 // Thresholds in one place so they are easy to review and tune.
 const LIMITS = {
   uptime_ok_days: 7, // under this: Bra
-  uptime_bad_days: 14, // from this: Behöver åtgärd
+  uptime_bad_days: 14, // more than this: Behöver åtgärd (plan: "> 14 dagar")
   cpu_ok_ratio: 0.7, // 1-min load per logical core
   cpu_bad_ratio: 1.0,
   mem_free_ok_percent: 20,
@@ -77,7 +77,7 @@ function uptimeSection(sys, uptimeText, now) {
   const days = round1(seconds / 86400);
   let grade = GRADE.GOOD;
   let advice = null;
-  if (days >= LIMITS.uptime_bad_days) {
+  if (days > LIMITS.uptime_bad_days) {
     grade = GRADE.BAD;
     advice = 'Starta om datorn – efter lång drifttid samlar macOS på sig minnesläckor och processer som hängt sig.';
   } else if (days >= LIMITS.uptime_ok_days) {
