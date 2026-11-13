@@ -10,9 +10,10 @@
 
 const pkg = require('../package.json');
 const { ToolError } = require('./lib/exec');
-const { collectOverview, collectProcesses, collectMemory, collectDisk, collectBattery, collectThermal, collectStartup } = require('./lib/collect');
+const { collectDiagnose, collectOverview, collectProcesses, collectMemory, collectDisk, collectBattery, collectThermal, collectStartup } = require('./lib/collect');
 const reports = require('./lib/reports');
 const { buildOverview, summarizeOverview } = require('./lib/overview');
+const { buildDiagnosis, summarizeDiagnosis, needsDiskFolders } = require('./lib/diagnose');
 const { scrub, localContext } = require('./lib/privacy');
 
 const SUPPORTED_PROTOCOLS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
@@ -22,6 +23,19 @@ const SUPPORTED_PROTOCOLS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 
 const TOOLS = [
+  {
+    name: 'diagnose_slowness',
+    title: 'Why is my Mac slow?',
+    description:
+      'Finds the likely reasons why this Mac feels slow and ranks them, most likely first. Checks uptime (over 14 days), '
+      + 'memory pressure and swap (over 2 GB, naming the apps using most memory), free disk (under 10 %, naming the largest home folders), '
+      + 'single processes over 80 % CPU in two measurements (named and explained), Spotlight indexing, heat throttling (kernel_task) '
+      + 'and battery health (under 80 %). Each cause has a plain-Swedish explanation, the number behind it and what the user can do. '
+      + 'Use it first when the user asks why their Mac is slow. Takes a few seconds (longer only if the disk is nearly full). Read-only, local.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { title: 'Why is my Mac slow?', ...READ_ONLY },
+    handler: diagnoseTool,
+  },
   {
     name: 'get_mac_overview',
     title: 'Mac health overview',
@@ -163,12 +177,19 @@ async function thermalTool() {
   return reports.buildThermalStatus(raw, { failures });
 }
 
+async function diagnoseTool() {
+  requireMac();
+  const { raw, failures, du_timed_out: duTimedOut } = await collectDiagnose({ needFolders: needsDiskFolders });
+  return buildDiagnosis(raw, { failures, duTimedOut });
+}
+
 async function startupTool() {
   requireMac();
   return reports.buildStartupItems(await collectStartup());
 }
 
 const SUMMARIES = {
+  diagnose_slowness: summarizeDiagnosis,
   battery_report: reports.summarizeBatteryReport,
   thermal_status: reports.summarizeThermalStatus,
   startup_items: reports.summarizeStartupItems,
@@ -205,7 +226,7 @@ async function handle(req) {
         protocolVersion,
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'mac-health', title: 'Mac Health', version: pkg.version },
-        instructions: 'Use get_mac_overview for a graded health check of this Mac (uptime, CPU, memory, disk, battery, heat). Dig deeper with top_processes (what is using CPU/memory), memory_report (pressure, swap, compression) disk_report (free space, largest home folders), battery_report, thermal_status and startup_items (what starts automatically). All tools are read-only and local.',
+        instructions: 'When the user asks why their Mac is slow, start with diagnose_slowness (ranked likely causes with the numbers behind them). Use get_mac_overview for a graded health check of this Mac (uptime, CPU, memory, disk, battery, heat). Dig deeper with top_processes (what is using CPU/memory), memory_report (pressure, swap, compression) disk_report (free space, largest home folders), battery_report, thermal_status and startup_items (what starts automatically). All tools are read-only and local.',
       });
     }
     case 'ping':

@@ -53,6 +53,12 @@ const fake = {
   async collectThermal() {
     return { raw: { pmset_therm: fx('pmset-therm.txt'), ioreg_battery: fx('ioreg-battery.txt') }, failures: {} };
   },
+  // Same overview + top fixtures, ps with the %cpu column (made-up CPU values). No du: the disk fixture is not full.
+  async collectDiagnose() {
+    const { raw, failures } = await fake.collectOverview();
+    Object.assign(raw, { top: fx('top.txt'), ps: fx('ps-cpu.txt') });
+    return { raw, failures, du_timed_out: false };
+  },
   async collectStartup() {
     return JSON.parse(fx('startup.json'));
   },

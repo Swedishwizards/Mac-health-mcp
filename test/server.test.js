@@ -42,7 +42,7 @@ test('MCP handshake, tools/list and get_mac_overview', async () => {
     notify('notifications/initialized');
 
     const list = await call('tools/list', {});
-    assert.deepEqual(list.result.tools.map((t) => t.name), ['get_mac_overview', 'top_processes', 'memory_report', 'disk_report', 'battery_report', 'thermal_status', 'startup_items']);
+    assert.deepEqual(list.result.tools.map((t) => t.name), ['diagnose_slowness', 'get_mac_overview', 'top_processes', 'memory_report', 'disk_report', 'battery_report', 'thermal_status', 'startup_items']);
     for (const t of list.result.tools) {
       assert.equal(t.annotations.readOnlyHint, true);
       assert.equal(t.annotations.openWorldHint, false);
@@ -224,6 +224,32 @@ test('battery_report on a Mac without battery over stdio', async () => {
     assert.equal(bat.result.isError, false);
     assert.equal(bat.result.structuredContent.present, false);
     assert.match(bat.result.content[0].text, /inget batteri/);
+  } finally {
+    child.kill();
+  }
+});
+
+test('diagnose_slowness over stdio: uptime, memory and a busy process, text and JSON, nothing identifying', async () => {
+  const { child, call } = startServer();
+  try {
+    await call('initialize', { protocolVersion: '2025-06-18' });
+    const res = await call('tools/call', { name: 'diagnose_slowness', arguments: {} });
+    assert.equal(res.result.isError, false);
+    const d = res.result.structuredContent;
+    const ids = d.likely_causes.map((c) => c.kind);
+    for (const id of ['long_uptime', 'memory_pressure', 'busy_process']) assert.ok(ids.includes(id), id);
+    assert.ok(d.found >= 3);
+    const busy = d.likely_causes.find((c) => c.kind === 'busy_process');
+    assert.equal(busy.numbers.name, 'DemoAntivirusScanner');
+    assert.equal(busy.numbers.cpu_percent_last_minute, 171.3);
+    const text = res.result.content[0].text;
+    assert.match(text, /Troliga orsaker \(mest trolig först\)/);
+    assert.match(text, /Lång tid sedan omstart/);
+    assert.deepEqual(JSON.parse(res.result.content[1].text), d);
+    assert.doesNotMatch(JSON.stringify(res.result), /\/Users\/|testuser|"serial|FAKESERIAL|XX0000/i);
+
+    const bad = await call('tools/call', { name: 'diagnose_slowness', arguments: { x: 1 } });
+    assert.equal(bad.result.isError, true);
   } finally {
     child.kill();
   }
