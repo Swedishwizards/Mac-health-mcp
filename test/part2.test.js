@@ -57,12 +57,16 @@ test('buildStartupItems marks Apple vs third party and handles missing folders',
   assert.match(s.advice, /Inloggningsobjekt/);
   const text = r.summarizeStartupItems(s);
   assert.match(text, /ändrar eller raderar aldrig/);
-  assert.doesNotMatch(text + s.advice, /\b(rm|radera dem|ta bort dem)\b/i);
+  assert.doesNotMatch(text + s.advice, /\b(rm|radera dem|ta bort dem|ta inte bort filer)\b/i);
+  assert.match(s.advice, /ändrar eller raderar aldrig något/);
 });
 
 test('buildStartupItems with real fixture and unreadable folders', () => {
   const s = r.buildStartupItems(JSON.parse(fx('startup.json')));
-  assert.ok(s.total > 0);
+  assert.equal(s.total, 11);
+  assert.equal(s.apple, 2);
+  assert.equal(s.third_party, 9);
+  assert.doesNotMatch(JSON.stringify(s), /google|mcafee|microsoft/i);
   assert.ok(s.items.every((i) => !/\/Users\//.test(JSON.stringify(i))));
   const denied = r.buildStartupItems({ dirs: [{ dir: '/Library/LaunchDaemons', files: null, error: 'denied' }] });
   assert.equal(denied.summary, 'Kunde inte läsa startmapparna.');

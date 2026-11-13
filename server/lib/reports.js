@@ -266,7 +266,7 @@ function buildStartupItems(raw = {}) {
     items,
     summary: readable ? `${items.length} saker startar automatiskt: ${third} från tredjepart, ${apple} från Apple.` : 'Kunde inte läsa startmapparna.',
     advice: third
-      ? 'Tredjepartsposter kan vara rester från program du inte längre använder. Kontrollera i Systeminställningar > Allmänt > Inloggningsobjekt och tillägg, eller avinstallera programmet på vanligt sätt. Ta inte bort filer för hand om du är osäker.'
+      ? 'Tredjepartsposter kan vara rester från program du inte längre använder. Stäng av autostart under Systeminställningar > Allmänt > Inloggningsobjekt och tillägg, eller avinstallera programmet på vanligt sätt. Mac Health ändrar eller raderar aldrig något.'
       : null,
     notes,
   };
