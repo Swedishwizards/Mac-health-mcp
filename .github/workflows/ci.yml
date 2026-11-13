@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, Node ${{ matrix.node }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS is the main runner (the product only runs on macOS). Ubuntu proves the tests
+        # never depend on real Mac data: everything runs on saved fixtures.
+        os: [macos-latest, ubuntu-latest]
+        node: [18, 22]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+      - name: Smoke test - server starts and lists tools over stdio
+        shell: bash
+        run: |
+          printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
+            | node server/index.js | tee out.txt
+          grep -q '"serverInfo"' out.txt
+          grep -q '"diagnose_slowness"' out.txt
+
+  bundle:
+    name: Build .mcpb (no publishing)
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pack
+        run: node scripts/pack.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-health-mcpb
+          path: dist/*.mcpb
+          if-no-files-found: error
