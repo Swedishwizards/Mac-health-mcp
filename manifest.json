@@ -4,7 +4,7 @@
   "display_name": "Mac Health",
   "version": "0.1.0",
   "description": "Ask Claude how your Mac is doing: CPU, memory, disk, battery, heat and uptime, each with a clear grade.",
-  "long_description": "Mac Health gives Claude a read-only health check of your Mac:\n\n- **get_mac_overview** – model, macOS version, uptime, CPU load, memory pressure, disk space, battery and thermal state, each graded Bra / Okej / Behöver åtgärd (Good / OK / Needs attention).\n\nEverything runs locally with built-in macOS tools (sysctl, sw_vers, vm_stat, df, pmset, ioreg). No internet access, no telemetry, no admin password, and serial numbers, UUIDs and user names are filtered out before anything reaches Claude.",
+  "long_description": "Mac Health gives Claude a read-only health check of your Mac:\n\n- **get_mac_overview** – model, macOS version, uptime, CPU load, memory pressure, disk space, battery and thermal state, each graded Bra / Okej / Behöver åtgärd (Good / OK / Needs attention).\n- **top_processes** – what is using CPU and memory right now, with cryptic macOS names explained.\n- **memory_report** – memory pressure, swap and compression in plain language.\n- **disk_report** – free space and the largest folders in your home folder (read-only).\n\nEverything runs locally with built-in macOS tools (sysctl, sw_vers, vm_stat, memory_pressure, df, du, top, ps, pmset, ioreg). No internet access, no telemetry, no admin password, and serial numbers, UUIDs and user names are filtered out before anything reaches Claude.",
   "author": {
     "name": "Swedishwizards",
     "url": "https://github.com/Swedishwizards/mac-health-mcp"
@@ -27,6 +27,18 @@
     {
       "name": "get_mac_overview",
       "description": "Health check of this Mac: model, macOS, uptime, CPU load, memory pressure, disk, battery and heat, each with a grade."
+    },
+    {
+      "name": "top_processes",
+      "description": "The apps using the most CPU and memory right now, with plain-language explanations of macOS process names."
+    },
+    {
+      "name": "memory_report",
+      "description": "Memory pressure, swap and compressed memory explained in plain language, with a grade."
+    },
+    {
+      "name": "disk_report",
+      "description": "Free disk space with a warning when low, plus the largest folders in your home folder. Read-only, never deletes."
     }
   ],
   "tools_generated": false,
