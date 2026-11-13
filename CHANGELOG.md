@@ -2,6 +2,19 @@
 
 Alla viktiga ändringar dokumenteras här. Formatet följer [Keep a Changelog](https://keepachangelog.com/) och projektet använder [semver](https://semver.org/).
 
+## [1.0.0] - 2026-11-13 (milstolpe 4)
+
+Första stabila versionen: 8 verktyg, och `diagnose_slowness` med åtta kontroller.
+
+### Tillagt
+- Tester: 83 till 125. Nya tester för integritet i alla 8 verktyg (inga serienummer, UUID:n eller användarnamn i svaren), protokollfel, tålighet när kommandon saknas eller misslyckas samt versionskontroll (serverns version följer `package.json` och `manifest.json`).
+- CI (GitHub Actions) på macOS och Ubuntu med Node 18 och 22. `.mcpb`-paketet byggs och sparas som artifact.
+- README skriven för v1.0.0 (vad det är, installation, verktyg, integritet), samt `docs/DEMO-GIF.md` med instruktion för demo-GIF:en.
+
+### Ändrat
+- Version 1.0.0 i `package.json` och `manifest.json`.
+- Paketeringen använder låst `@anthropic-ai/mcpb` 2.1.2.
+
 ## [0.3.1] - Oreleasad (förbättring 1/5)
 
 ### Tillagt
