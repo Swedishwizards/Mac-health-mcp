@@ -16,17 +16,19 @@ function exchange(lines, expected, { env = {}, preload = FAKE, waitMs = 3000 } =
   return new Promise((resolve) => {
     let buf = '';
     let done = false;
+    const complete = () => buf.split('\n').slice(0, -1).filter(Boolean);
     const finish = () => {
       if (done) return;
       done = true;
       clearTimeout(timer);
       child.kill();
-      resolve(buf.split('\n').filter(Boolean).map((l) => JSON.parse(l)));
+      // Only complete lines (ending in a newline) are parsed: a reply split across chunks is not read half-way.
+      resolve(complete().map((l) => JSON.parse(l)));
     };
     const timer = setTimeout(finish, waitMs);
     child.stdout.on('data', (d) => {
       buf += d;
-      if (buf.split('\n').filter(Boolean).length >= expected) finish();
+      if (complete().length >= expected) finish();
     });
     for (const l of lines) child.stdin.write(l + '\n');
   });

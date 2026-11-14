@@ -105,7 +105,7 @@ function rawExchange(lines, expected) {
     let buf = '';
     child.stdout.on('data', (d) => {
       buf += d;
-      const msgs = buf.split('\n').filter(Boolean);
+      const msgs = buf.split('\n').slice(0, -1).filter(Boolean); // complete lines only
       if (msgs.length >= expected) { child.kill(); resolve(msgs.map((l) => JSON.parse(l))); }
     });
     for (const l of lines) child.stdin.write(l + '\n');
