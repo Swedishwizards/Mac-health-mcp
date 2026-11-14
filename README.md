@@ -21,15 +21,9 @@ Built with Claude.
 
 ## Demo
 
-<!--
-  DEMO GIF PLACEHOLDER: docs/demo.gif does not exist yet.
-  It shows the question "Why is my Mac slow?" in Claude Desktop and the answer.
-  How to record it: see docs/DEMO-GIF.md. When the file is added, replace this comment and
-  the "coming soon" line below with:
-  <p align="center"><img src="docs/demo.gif" width="720" alt="Asking Claude 'Why is my Mac slow?' and getting ranked causes"></p>
--->
+<p align="center"><img src="docs/demo.gif" width="720" alt="Asking Claude 'Why is my Mac slow?' and getting ranked causes"></p>
 
-*Demo GIF coming soon. Until then, an example conversation (made-up example values):*
+*The same kind of conversation as text (made-up example values):*
 
 ```text
 You:     Why is my Mac slow?
