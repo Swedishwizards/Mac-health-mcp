@@ -54,6 +54,8 @@ Claude:  I found 3 likely causes, most likely first:
 
 Claude Desktop runs the extension with its own built-in Node.js, so nothing else needs to be installed.
 
+If the extension stays on "starting" or Claude Desktop reports "Request timed out", remove it under *Settings → Extensions* and use option B instead. It runs the same code.
+
 ### Option B: manual configuration
 
 Download or clone the repository to a permanent folder. No `npm install` is needed (there are no dependencies). Replace `/path/to/mac-health-mcp` below with the real folder.
