@@ -1,0 +1,118 @@
+'use strict';
+// Preloaded with `node -r` in tests: replaces the command collector with fixture data
+// (made-up output in the same format as macOS), so the server can be tested on any OS.
+//   FAKE_MISSING=key1,key2  -> those commands behave as if missing
+//   FAKE_THROW=error|toolerror -> every collector throws (unexpected Error / ToolError with a hint);
+//                                 the message contains made-up identifiers that must be filtered out
+//   FAKE_LEAK=1             -> every tool result gets made-up identifiers added (keys and text),
+//                              to prove the privacy filter in server/index.js covers all tools
+const fs = require('node:fs');
+const path = require('node:path');
+const Module = require('node:module');
+
+const fx = (name) => fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8');
+const FILES = {
+  sysctl: 'sysctl.txt', sw_vers: 'sw_vers.txt', uptime: 'uptime.txt', memory_pressure: 'memory_pressure.txt',
+  vm_stat: 'vm_stat.txt', df: 'df.txt', pmset_batt: 'pmset-batt.txt', pmset_therm: 'pmset-therm.txt',
+  ioreg_battery: 'ioreg-battery.txt',
+};
+
+const fake = {
+  async collectOverview() {
+    const missing = (process.env.FAKE_MISSING || '').split(',').filter(Boolean);
+    const raw = {};
+    const failures = {};
+    for (const [k, f] of Object.entries(FILES)) {
+      if (missing.includes(k)) { raw[k] = null; failures[k] = 'saknas på den här datorn'; } else raw[k] = fx(f);
+    }
+    return { raw, failures };
+  },
+  async collectProcesses() {
+    const missing = (process.env.FAKE_MISSING || '').split(',').filter(Boolean);
+    const raw = {}; const failures = {};
+    for (const [k, f] of [['top', 'top.txt'], ['ps', 'ps.txt']]) {
+      if (missing.includes(k)) { raw[k] = null; failures[k] = 'saknas på den här datorn'; } else raw[k] = fx(f);
+    }
+    return { raw, failures };
+  },
+  async collectMemory() {
+    return { raw: { sysctl: fx('sysctl.txt'), memory_pressure: fx('memory_pressure.txt'), vm_stat: fx('vm_stat.txt') }, failures: {} };
+  },
+  //   FAKE_DU_TIMEOUT=1 -> du was cut off: only the first folders, no total line
+  async collectDisk() {
+    let du = fx('du.txt');
+    const timedOut = process.env.FAKE_DU_TIMEOUT === '1';
+    if (timedOut) du = du.split('\n').slice(0, 10).join('\n') + '\n';
+    return {
+      raw: { df: fx('df.txt'), du_stdout: du, du_stderr: fx('du-stderr.txt'), home: '/Users/testuser', du_unfinished: timedOut ? ['~/Library'] : [] },
+      failures: {},
+      du_timed_out: timedOut,
+    };
+  },
+  //   FAKE_NO_BATTERY=1 -> a desktop Mac (pmset reports AC power only, ioreg finds nothing)
+  async collectBattery() {
+    if (process.env.FAKE_NO_BATTERY === '1') return { raw: { pmset_batt: "Now drawing from 'AC Power'\n", ioreg_battery: null }, failures: {} };
+    return { raw: { pmset_batt: fx('pmset-batt.txt'), ioreg_battery: fx('ioreg-battery.txt') }, failures: {} };
+  },
+  async collectThermal() {
+    return { raw: { pmset_therm: fx('pmset-therm.txt'), ioreg_battery: fx('ioreg-battery.txt') }, failures: {} };
+  },
+  // Same overview + top fixtures, ps with the %cpu column (made-up CPU values). No du: the disk fixture is not full.
+  async collectDiagnose() {
+    const { raw, failures } = await fake.collectOverview();
+    Object.assign(raw, { top: fx('top.txt'), ps: fx('ps-cpu.txt'), startup: JSON.parse(fx('startup.json')) });
+    return { raw, failures, du_timed_out: false };
+  },
+  async collectStartup() {
+    return JSON.parse(fx('startup.json'));
+  },
+};
+
+// Made-up identifiers only (never real values from any machine).
+const LEAK_TEXT = ' [läcka: /Users/testuser/DemoApp/data.db, "Serial" = "FAKESERIAL000000", 00000000-1111-2222-3333-444444444444, aa:bb:cc:dd:ee:ff, testuser]';
+
+const throwMode = process.env.FAKE_THROW;
+if (throwMode) {
+  const { ToolError } = require('../server/lib/exec');
+  for (const k of Object.keys(fake)) {
+    fake[k] = async () => {
+      const msg = `boom in /Users/testuser/DemoApp ("Serial" = "FAKESERIAL000000")${LEAK_TEXT}`;
+      if (throwMode === 'toolerror') throw new ToolError(msg, { code: 'demo_failed', hint: 'Open /Users/testuser/DemoApp and try again.' });
+      throw new Error(msg);
+    };
+  }
+}
+
+function addLeak(result) {
+  if (!result || typeof result !== 'object') return result;
+  const out = { ...result,
+    serial_number: 'FAKESERIAL000000', hardware_uuid: '00000000-1111-2222-3333-444444444444', username: 'testuser',
+    home: '/Users/testuser', device_name: 'DemoApp-Mac', leak_note: LEAK_TEXT.trim() };
+  if (typeof out.summary === 'string') out.summary += LEAK_TEXT;
+  // get_mac_overview has one summary per part instead of a top-level one.
+  for (const [k, v] of Object.entries(out)) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.summary === 'string') out[k] = { ...v, summary: v.summary + LEAK_TEXT };
+  }
+  return out;
+}
+
+function wrapBuilders(mod) {
+  const wrapped = { ...mod };
+  for (const [k, fn] of Object.entries(mod)) {
+    if (/^build/.test(k) && typeof fn === 'function') wrapped[k] = (...a) => addLeak(fn(...a));
+  }
+  return wrapped;
+}
+
+// The server refuses to run off macOS; pretend to be a Mac inside the test process only.
+Object.defineProperty(process, 'platform', { value: 'darwin' });
+
+const origLoad = Module._load;
+Module._load = function (request, parent, isMain) {
+  const fromServer = parent && /server[\\/]index\.js$/.test(parent.filename);
+  if (/lib[\\/]collect$/.test(request) && fromServer) return fake;
+  if (process.env.FAKE_LEAK === '1' && fromServer && /lib[\\/](reports|overview|diagnose)$/.test(request)) {
+    return wrapBuilders(origLoad.call(this, request, parent, isMain));
+  }
+  return origLoad.call(this, request, parent, isMain);
+};

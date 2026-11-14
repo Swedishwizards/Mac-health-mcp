@@ -1,0 +1,12 @@
+du: /Users/testuser/Pictures/Photos Library.photoslibrary: Operation not permitted
+du: /Users/testuser/Library/Application Support/MobileSync: Operation not permitted
+du: /Users/testuser/Library/Application Support/CallHistoryTransactions: Operation not permitted
+du: /Users/testuser/Library/Application Support/CloudDocs: Operation not permitted
+du: /Users/testuser/Library/Application Support/com.apple.sharedfilelist: Operation not permitted
+du: /Users/testuser/Library/Application Support/Knowledge: Operation not permitted
+du: /Users/testuser/Library/Application Support/com.apple.TCC: Operation not permitted
+du: /Users/testuser/Library/Application Support/FileProvider: Operation not permitted
+du: /Users/testuser/Library/Application Support/AddressBook: Operation not permitted
+du: /Users/testuser/Library/Application Support/FaceTime: Operation not permitted
+du: /Users/testuser/Library/Application Support/DifferentialPrivacy: Operation not permitted
+du: /Users/testuser/Library/Application Support/com.apple.avfoundation/Frecents: Operation not permitted

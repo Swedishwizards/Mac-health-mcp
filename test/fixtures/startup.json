@@ -1,0 +1,33 @@
+{
+  "dirs": [
+    {
+      "dir": "~/Library/LaunchAgents",
+      "files": [
+        "com.example.updater.wake.plist",
+        "com.example.updater.agent.plist",
+        "com.example.updater.xpcservice.plist"
+      ],
+      "error": null
+    },
+    {
+      "dir": "/Library/LaunchAgents",
+      "files": [
+        "com.vendor.agent.plist",
+        "com.vendor.menulet.plist",
+        "com.vendor.reporter.plist",
+        "com.othervendor.syncagent.plist",
+        "com.apple.example.helper.plist"
+      ],
+      "error": null
+    },
+    {
+      "dir": "/Library/LaunchDaemons",
+      "files": [
+        "com.vendor.daemon.plist",
+        "com.othervendor.updatehelper.plist",
+        "com.apple.example.daemon.plist"
+      ],
+      "error": null
+    }
+  ]
+}

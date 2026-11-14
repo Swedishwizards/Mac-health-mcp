@@ -1,0 +1,8 @@
+hw.model: Mac14,2
+hw.memsize: 8589934592
+hw.ncpu: 8
+machdep.cpu.brand_string: Apple M2
+kern.boottime: { sec = 1765194600, usec = 0 } Mon Dec  8 12:50:00 2025
+vm.loadavg: { 5.84 5.21 4.77 }
+vm.swapusage: total = 4096.00M  used = 3277.25M  free = 818.75M  (encrypted)
+kern.memorystatus_vm_pressure_level: 2

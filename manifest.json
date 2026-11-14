@@ -1,0 +1,70 @@
+{
+  "manifest_version": "0.3",
+  "name": "mac-health",
+  "display_name": "Mac Health",
+  "version": "1.0.0",
+  "description": "Ask Claude how your Mac is doing: CPU, memory, disk, battery, heat and uptime, each with a clear grade.",
+  "long_description": "Mac Health gives Claude a read-only health check of your Mac:\n\n- **diagnose_slowness** – why is my Mac slow? Likely causes ranked, each with the number behind it and what you can do.\n- **get_mac_overview** – model, macOS version, uptime, CPU load, memory pressure, disk space, battery and thermal state, each graded Bra / Okej / Behöver åtgärd (Good / OK / Needs attention).\n- **top_processes** – what is using CPU and memory right now, with cryptic macOS names explained.\n- **memory_report** – memory pressure, swap and compression in plain language.\n- **disk_report** – free space and the largest folders in your home folder (read-only).\n- **battery_report** – battery health, cycles and charging tips.\n- **thermal_status** – is the Mac throttling because of heat?\n- **startup_items** – what starts automatically, Apple or third party.\n\nEverything runs locally with built-in macOS tools (sysctl, sw_vers, vm_stat, memory_pressure, df, du, top, ps, pmset, ioreg). No internet access, no telemetry, no admin password, and serial numbers, UUIDs and user names are filtered out before anything reaches Claude.",
+  "author": {
+    "name": "Swedishwizards",
+    "url": "https://github.com/Swedishwizards/mac-health-mcp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Swedishwizards/mac-health-mcp"
+  },
+  "homepage": "https://github.com/Swedishwizards/mac-health-mcp",
+  "support": "https://github.com/Swedishwizards/mac-health-mcp/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"]
+    }
+  },
+  "tools": [
+    {
+      "name": "diagnose_slowness",
+      "description": "Why is my Mac slow? Ranked likely causes (uptime, memory, disk, busy processes, Spotlight, heat, battery, startup items) with the numbers behind them and what to do."
+    },
+    {
+      "name": "get_mac_overview",
+      "description": "Health check of this Mac: model, macOS, uptime, CPU load, memory pressure, disk, battery and heat, each with a grade."
+    },
+    {
+      "name": "top_processes",
+      "description": "The apps using the most CPU and memory right now, with plain-language explanations of macOS process names."
+    },
+    {
+      "name": "memory_report",
+      "description": "Memory pressure, swap and compressed memory explained in plain language, with a grade."
+    },
+    {
+      "name": "disk_report",
+      "description": "Free disk space with a warning when low, plus the largest folders in your home folder. Read-only, never deletes."
+    },
+    {
+      "name": "battery_report",
+      "description": "Battery health, charge cycles, charge state and tips, with a grade. Calm answer on Macs without a battery."
+    },
+    {
+      "name": "thermal_status",
+      "description": "Whether the Mac is slowing down because it is too hot (thermal throttling)."
+    },
+    {
+      "name": "startup_items",
+      "description": "What starts automatically (launch agents and daemons), marked Apple or third party. Lists only, never deletes."
+    }
+  ],
+  "tools_generated": false,
+  "keywords": ["mac", "macos", "health", "performance", "slow", "memory", "disk", "battery", "thermal", "uptime"],
+  "license": "MIT",
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["darwin"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}
